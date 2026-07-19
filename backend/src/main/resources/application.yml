@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sub130-backend
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/sub130}
+
+app:
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost}
+  # Auth is disabled when password is blank (local dev). Set both in production to lock the app.
+  username: ${APP_USERNAME:admin}
+  password: ${APP_PASSWORD:}
+
+strava:
+  client-id: ${STRAVA_CLIENT_ID:}
+  client-secret: ${STRAVA_CLIENT_SECRET:}
+  redirect-uri: ${STRAVA_REDIRECT_URI:http://localhost:3000/api/strava/callback}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
