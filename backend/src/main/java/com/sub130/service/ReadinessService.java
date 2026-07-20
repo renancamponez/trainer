@@ -59,46 +59,74 @@ public class ReadinessService {
         DayLog today = byDate.get(d);
 
         Double hrv = today == null ? null : today.hrvMs;
+        Integer rhr = today == null ? null : today.restingHr;
+        Integer sleep = today == null ? null : today.sleepScore;
         Double load = today == null ? null : today.load();
 
-        // HRV baseline: prior 7 days, need at least 4 readings
+        // Personal baselines: rolling average of the prior 7 days (need >=4 readings)
         List<Double> priorHrv = collect(byDate, d.minusDays(7), d.minusDays(1), l -> l.hrvMs);
-        Double baseline = priorHrv.size() >= 4 ? round1(avg(priorHrv)) : null;
+        Double hrvBase = priorHrv.size() >= 4 ? round1(avg(priorHrv)) : null;
+        List<Double> priorRhr = collect(byDate, d.minusDays(7), d.minusDays(1),
+                l -> l.restingHr == null ? null : (double) l.restingHr);
+        Double rhrBase = priorRhr.size() >= 4 ? round1(avg(priorRhr)) : null;
 
-        Integer pct = (hrv != null && baseline != null && baseline > 0)
-                ? (int) Math.round(100 * hrv / baseline) : null;
+        Integer hrvPct = (hrv != null && hrvBase != null && hrvBase > 0)
+                ? (int) Math.round(100 * hrv / hrvBase) : null;
 
-        // Acute load: last 7 days (incl today)
+        // Per-signal readiness sub-scores (0-1). Each only counts if its inputs exist.
+        //  HRV : ratio to baseline, 1.00 -> 1.0, 0.925 -> 0.5, <=0.85 -> 0
+        //  RHR : rise over baseline is bad; +0 -> 1.0, +3.5 -> 0.5, >=+7 -> 0
+        //  Sleep: Garmin score (absolute); 85 -> 1.0, 60 -> 0.5, <=35 -> 0
+        Double sHrv = (hrv != null && hrvBase != null && hrvBase > 0)
+                ? clamp((hrv / hrvBase - 0.85) / 0.15, 0, 1) : null;
+        Double sRhr = (rhr != null && rhrBase != null)
+                ? clamp(1 - Math.max(0, rhr - rhrBase) / 7.0, 0, 1) : null;
+        Double sSleep = (sleep != null) ? clamp((sleep - 35) / 50.0, 0, 1) : null;
+
+        // Weighted composite over whatever is available (HRV 50 / RHR 30 / Sleep 20).
+        double wSum = 0, sSum = 0;
+        if (sHrv != null)   { wSum += 0.5; sSum += 0.5 * sHrv; }
+        if (sRhr != null)   { wSum += 0.3; sSum += 0.3 * sRhr; }
+        if (sSleep != null) { wSum += 0.2; sSum += 0.2 * sSleep; }
+        Integer score = wSum > 0 ? (int) Math.round(100 * sSum / wSum) : null;
+
+        // Load / ACWR (unchanged)
         List<Double> acuteLoads = collect(byDate, d.minusDays(6), d, DayLog::load);
         Double acute = acuteLoads.isEmpty() ? null : sum(acuteLoads);
-
-        // Chronic load: last 28 days / 4, need >=14 load-days
         List<Double> chronicLoads = collect(byDate, d.minusDays(27), d, DayLog::load);
         Double chronic = chronicLoads.size() >= 14 ? round0(sum(chronicLoads) / 4) : null;
-
-        Double acwr = (acute != null && chronic != null && chronic > 0)
-                ? round2(acute / chronic) : null;
+        Double acwr = (acute != null && chronic != null && chronic > 0) ? round2(acute / chronic) : null;
 
         String verdict, action;
-        if (pct == null) {
+        if (score == null) {
             verdict = "NEEDS_DATA";
-            action = "Train as planned (log HRV daily to unlock readiness).";
-        } else if (pct < 90) {
-            verdict = "RED";
-            action = "STOP: swap today for easy 30-40min or full rest. Do not do the workout.";
-        } else if (pct < 95) {
-            verdict = "AMBER";
-            action = "EASE OFF: run the session at easy pace, or halve the reps.";
-        } else if (acwr != null && acwr > 1.5) {
-            verdict = "GREEN";
-            action = "Load spike (ACWR>1.5): train as planned but hold volume flat this week.";
+            action = "Log HRV, resting HR and sleep score to unlock readiness.";
         } else {
-            verdict = "GREEN";
-            action = "Train as planned.";
+            List<String> drivers = new java.util.ArrayList<>();
+            if (sHrv != null && sHrv < 0.6) drivers.add("HRV " + hrvPct + "% of usual");
+            if (sRhr != null && sRhr < 0.6) drivers.add("resting HR +" + (int) Math.round(rhr - rhrBase) + " bpm");
+            if (sSleep != null && sSleep < 0.6) drivers.add("sleep score " + sleep);
+            String why = drivers.isEmpty() ? "" : " (" + String.join(", ", drivers) + ")";
+            if (score < 45) {
+                verdict = "RED";
+                action = "STOP: swap today for easy 30-40min or full rest" + why + ".";
+            } else if (score < 66) {
+                verdict = "AMBER";
+                action = "EASE OFF: run easy or halve the reps" + why + ".";
+            } else if (acwr != null && acwr > 1.5) {
+                verdict = "GREEN";
+                action = "Load spike (ACWR>1.5): train as planned but hold volume flat this week.";
+            } else {
+                verdict = "GREEN";
+                action = "Train as planned.";
+            }
         }
 
-        return new ReadinessResult(date, hrv, baseline, pct, load, acute, chronic, acwr, verdict, action);
+        return new ReadinessResult(date, score, hrv, hrvBase, hrvPct, rhr, rhrBase, sleep,
+                load, acute, chronic, acwr, verdict, action);
     }
+
+    private static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
 
     private interface Getter { Double get(DayLog l); }
 

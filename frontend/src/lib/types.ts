@@ -14,6 +14,7 @@ export interface DaySummary {
   actualKm: number | null; actualMinutes: number | null;
   avgHr: number | null; notes: string | null;
   hrvMs: number | null; restingHr: number | null; sleepScore: number | null;
+  readinessScore: number | null;
   hrvPctOfBase: number | null; load: number | null; acwr: number | null;
   verdict: string | null; readinessAction: string | null;
   score: number | null; grade: string | null; scoreHeadline: string | null;
@@ -53,6 +54,14 @@ export interface StravaStatus {
 export interface StravaImportedDay { date: string; km: number; minutes: number; avgHr: number | null; }
 export interface StravaSyncResult { imported: number; days: StravaImportedDay[]; }
 export interface StravaConfigView { clientId: string; secretSet: boolean; source: "app" | "env" | "none"; }
+
+export interface ReadinessResult {
+  date: string; readinessScore: number | null;
+  hrv: number | null; hrvBaseline: number | null; hrvPctOfBase: number | null;
+  restingHr: number | null; rhrBaseline: number | null; sleepScore: number | null;
+  load: number | null; acuteLoad: number | null; chronicLoad: number | null; acwr: number | null;
+  verdict: string; action: string;
+}
 
 export interface WorkoutStep {
   phase: string; what: string; amount: string; pace: string; mph: string; incline: string; hr: string; cue: string;

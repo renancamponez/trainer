@@ -123,6 +123,7 @@ public class AnalyticsService {
                 log == null ? null : log.hrvMs,
                 log == null ? null : log.restingHr,
                 log == null ? null : log.sleepScore,
+                r == null ? null : r.readinessScore(),
                 r == null ? null : r.hrvPctOfBase(),
                 r == null ? null : r.load(),
                 r == null ? null : r.acwr(),

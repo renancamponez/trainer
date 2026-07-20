@@ -187,7 +187,10 @@ export default function Dashboard() {
       <div className="grid cols-3" style={{ marginBottom: 20 }}>
         <div className="tile">
           <div className="label">Readiness (today)</div>
-          <div className="value"><VerdictBadge verdict={today?.verdict ?? null} /></div>
+          <div className="value" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            {today?.readinessScore != null && <span>{today.readinessScore}</span>}
+            <VerdictBadge verdict={today?.verdict ?? null} />
+          </div>
           <div className="sub">{today?.readinessAction ?? "—"}</div>
         </div>
         <div className="tile">

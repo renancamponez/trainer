@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
-import type { DaySummary, DayLog, ScoreResult } from "../lib/types";
+import type { DaySummary, DayLog, ScoreResult, ReadinessResult } from "../lib/types";
 import { fmtDate, paceFromKmMin } from "../lib/format";
 import { TypeBadge, VerdictBadge, SourceBadge } from "../components/Badges";
 import WorkoutSteps from "../components/WorkoutSteps";
@@ -16,12 +16,14 @@ export default function LogSession() {
   const [plan, setPlan] = useState<DaySummary | null>(null);
   const [log, setLog] = useState<DayLog>(empty(date));
   const [score, setScore] = useState<ScoreResult | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
   const [savedCard, setSavedCard] = useState<"" | "session" | "readiness">("");
 
   useEffect(() => {
     api.daySummary(date).then(setPlan).catch(() => {});
     api.getLog(date).then((l) => setLog(l ?? empty(date)));
     api.score(date).then(setScore).catch(() => {});
+    api.readiness(date).then(setReadiness).catch(() => {});
   }, [date]);
 
   function set<K extends keyof DayLog>(k: K, v: DayLog[K]) {
@@ -38,6 +40,7 @@ export default function LogSession() {
     setSavedCard(which);
     setScore(await api.score(date));
     api.daySummary(date).then(setPlan).catch(() => {});
+    api.readiness(date).then(setReadiness).catch(() => {});
   }
   const saveSession = () => persist(true, "session");
   const saveReadiness = () => persist(log.done, "readiness");
@@ -94,7 +97,8 @@ export default function LogSession() {
             <span className="pill" style={{ background: "#5c6b7a33", color: "#93a1b0" }}>manual only</span>
           </div>
           <div className="note" style={{ marginBottom: 12 }}>
-            Measured on waking. These feed the readiness engine and never come from Strava.
+            Measured on waking. HRV, resting HR and sleep score together drive your readiness score —
+            never from Strava.
           </div>
           <div className="grid cols-3">
             <div className="field"><label>HRV (ms)</label>
@@ -114,11 +118,23 @@ export default function LogSession() {
       {/* --- Result --- */}
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Result</h3>
-        {plan && (
-          <div className="row" style={{ marginBottom: 12, gap: 20 }}>
-            <div><div className="muted" style={{ fontSize: 12 }}>Readiness</div><VerdictBadge verdict={plan.verdict} /></div>
-            {plan.hrvPctOfBase != null && <div><div className="muted" style={{ fontSize: 12 }}>HRV vs base</div><b>{plan.hrvPctOfBase}%</b></div>}
-            {plan.acwr != null && <div><div className="muted" style={{ fontSize: 12 }}>ACWR</div><b>{plan.acwr}</b></div>}
+        {readiness && (
+          <div style={{ marginBottom: 16 }}>
+            <div className="row" style={{ gap: 12, alignItems: "baseline", marginBottom: 6 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Readiness</div>
+              {readiness.readinessScore != null && <span style={{ fontSize: 24, fontWeight: 800 }}>{readiness.readinessScore}<span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>/100</span></span>}
+              <VerdictBadge verdict={readiness.verdict} />
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{readiness.action}</div>
+            <table className="mtable"><tbody>
+              <tr><td className="k">HRV</td><td>{readiness.hrv != null ? `${readiness.hrv} ms` : "—"}
+                {readiness.hrvPctOfBase != null && <span className="muted"> · {readiness.hrvPctOfBase}% of {readiness.hrvBaseline}</span>}</td></tr>
+              <tr><td className="k">Resting HR</td><td>{readiness.restingHr != null ? `${readiness.restingHr} bpm` : "—"}
+                {readiness.restingHr != null && readiness.rhrBaseline != null && (() => { const dlt = Math.round(readiness.restingHr! - readiness.rhrBaseline!); return <span className="muted"> · usual {readiness.rhrBaseline}, {dlt >= 0 ? "+" : ""}{dlt}</span>; })()}</td></tr>
+              <tr><td className="k">Sleep score</td><td>{readiness.sleepScore != null ? `${readiness.sleepScore}/100` : "—"}</td></tr>
+              <tr><td className="k">ACWR</td><td>{readiness.acwr != null ? readiness.acwr : "—"}<span className="muted"> · load ratio (0.8–1.3 ideal)</span></td></tr>
+            </tbody></table>
+            <div className="note" style={{ marginTop: 6 }}>Composite: HRV 50% · resting HR 30% · sleep 20% (of whatever you've logged).</div>
           </div>
         )}
         {score && score.score != null ? (

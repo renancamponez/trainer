@@ -7,7 +7,7 @@ public record DaySummary(
         String paceRange, String mphRange, String hrZone, String targetHrBpm, String incline,
         boolean checkpoint,
         boolean done, String source, Double actualKm, Integer actualMinutes, Integer avgHr, String notes,
-        Double hrvMs, Integer restingHr, Integer sleepScore,
+        Double hrvMs, Integer restingHr, Integer sleepScore, Integer readinessScore,
         Integer hrvPctOfBase, Double load, Double acwr, String verdict, String readinessAction,
         Double score, String grade, String scoreHeadline
 ) {}
