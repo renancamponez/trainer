@@ -5,6 +5,7 @@ import type { DaySummary, DayLog, ScoreResult, ReadinessResult } from "../lib/ty
 import { fmtDate, paceFromKmMin } from "../lib/format";
 import { TypeBadge, VerdictBadge, SourceBadge } from "../components/Badges";
 import WorkoutSteps from "../components/WorkoutSteps";
+import PaceChart from "../components/PaceChart";
 
 const empty = (date: string): DayLog => ({
   date, done: false, actualKm: null, actualMinutes: null, avgHr: null,
@@ -57,6 +58,13 @@ export default function LogSession() {
         <div className="card" style={{ marginBottom: 16 }}>
           <h3>Workout — step by step</h3>
           <WorkoutSteps date={date} />
+        </div>
+      )}
+
+      {plan && plan.type !== "Rest" && plan.type !== "Off" && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Pace — planned vs actual</h3>
+          <PaceChart date={date} />
         </div>
       )}
 

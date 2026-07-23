@@ -1,6 +1,7 @@
 import type {
   DaySummary, WeekSummary, DayLog, ScoreResult, SettingsResponse, Settings, PlannedSession,
   StravaStatus, StravaSyncResult, StravaConfigView, GoalProjection, WorkoutDetail, ReadinessResult,
+  PaceProfile,
 } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -24,6 +25,7 @@ export const api = {
   goal: (asOf: string) => req<GoalProjection>(`/goal?asOf=${asOf}`),
   planWeek: (week: number) => req<PlannedSession[]>(`/plan/week/${week}`),
   workout: (date: string) => req<WorkoutDetail>(`/plan/workout/${date}`),
+  profile: (date: string) => req<PaceProfile>(`/plan/profile/${date}`),
 
   getLog: (date: string) => req<DayLog | null>(`/logs/${date}`).catch(() => null),
   saveLog: (date: string, log: Partial<DayLog>) =>

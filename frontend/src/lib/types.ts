@@ -63,6 +63,11 @@ export interface ReadinessResult {
   verdict: string; action: string;
 }
 
+export interface PaceProfilePoint { t: number; planned: number | null; actual: number | null; }
+export interface PaceProfile {
+  date: string; title: string; hasActual: boolean; points: PaceProfilePoint[];
+}
+
 export interface WorkoutStep {
   phase: string; what: string; amount: string; pace: string; mph: string; incline: string; hr: string; cue: string;
 }

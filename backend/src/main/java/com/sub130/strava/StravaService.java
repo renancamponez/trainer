@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sub130.domain.DayLog;
 import com.sub130.repo.DayLogRepository;
+import com.sub130.service.RepDetector;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -203,6 +204,9 @@ public class StravaService {
     public List<ImportedDay> importActivities(Iterable<JsonNode> activities, String token, boolean enforcePlanRange) {
         // Aggregate per date (a day can hold more than one run).
         Map<String, double[]> agg = new TreeMap<>(); // date -> [distM, movingS, hrTimeWeighted, hrTime]
+        Map<String, List<DayLog.Rep>> repsByDate = new HashMap<>(); // reps from the day's primary (longest) run
+        Map<String, List<Double>> speedByDate = new HashMap<>();
+        Map<String, Double> primaryMovingS = new HashMap<>();
         for (JsonNode a : activities) {
             String type = a.hasNonNull("sport_type") ? a.get("sport_type").asText() : a.path("type").asText("");
             if (!RUN_TYPES.contains(type)) continue;
@@ -210,17 +214,28 @@ public class StravaService {
             if (local.length() < 10) continue;
             LocalDate date = LocalDate.parse(local.substring(0, 10));
             if (enforcePlanRange && (date.isBefore(PLAN_START) || date.isAfter(PLAN_END))) continue;
+            String key = date.toString();
 
-            double[] v = agg.computeIfAbsent(date.toString(), k -> new double[4]);
+            double[] v = agg.computeIfAbsent(key, k -> new double[4]);
             double distM = a.path("distance").asDouble(0);
             double movingS = a.path("moving_time").asDouble(0);
             v[0] += distM;
             v[1] += movingS;
 
-            Double hr = activityAvgHr(a, token);
+            // One stream fetch per activity yields both the trimmed HR and the detected reps.
+            StreamResult sr = (token != null && a.hasNonNull("id") && movingS >= 300)
+                    ? analyzeStreams(a.get("id").asLong(), token) : null;
+
+            Double hr = (sr != null && sr.trimmedHr != null) ? (double) sr.trimmedHr
+                    : (a.hasNonNull("average_heartrate") ? a.get("average_heartrate").asDouble() : null);
             if (hr != null && movingS > 0) {
                 v[2] += hr * movingS;
                 v[3] += movingS;
+            }
+            if (sr != null && movingS > primaryMovingS.getOrDefault(key, 0.0)) {
+                primaryMovingS.put(key, movingS);
+                repsByDate.put(key, sr.reps);
+                speedByDate.put(key, sr.speedSeries);
             }
         }
 
@@ -234,44 +249,79 @@ public class StravaService {
             log.actualMinutes = (int) Math.round(v[1] / 60.0);
             Integer hr = v[3] > 0 ? (int) Math.round(v[2] / v[3]) : null;
             if (hr != null) log.avgHr = hr;
+            if (repsByDate.containsKey(e.getKey())) log.reps = repsByDate.get(e.getKey());
+            if (speedByDate.containsKey(e.getKey())) log.speedSeries = speedByDate.get(e.getKey());
             logRepo.save(log);
             out.add(new ImportedDay(e.getKey(), log.actualKm, log.actualMinutes, log.avgHr));
         }
         return out;
     }
 
-    /** Trimmed HR (skip first/last 2 min) via the stream when possible, else the whole-activity avg. */
-    private Double activityAvgHr(JsonNode a, String token) {
-        double movingS = a.path("moving_time").asDouble(0);
-        if (token != null && a.hasNonNull("id") && movingS > 360) { // >6min: worth trimming 2+2
-            Integer trimmed = trimmedStreamHr(a.get("id").asLong(), token);
-            if (trimmed != null) return (double) trimmed;
-        }
-        return a.hasNonNull("average_heartrate") ? a.get("average_heartrate").asDouble() : null;
-    }
+    private record StreamResult(Integer trimmedHr, List<DayLog.Rep> reps, List<Double> speedSeries) {}
 
-    /** Average of the HR stream between t=120s and t=(end-120s). Null if unavailable/too short. */
-    private Integer trimmedStreamHr(long activityId, String token) {
+    /**
+     * One streams call (HR + velocity + distance) yielding the trimmed average HR (first/last
+     * 2 min removed) and the hard efforts detected from the velocity stream. Either may be null/empty.
+     */
+    private StreamResult analyzeStreams(long activityId, String token) {
         try {
             JsonNode s = getJson("https://www.strava.com/api/v3/activities/" + activityId
-                    + "/streams?keys=heartrate,time&key_by_type=true", token);
-            JsonNode hr = s.path("heartrate").path("data");
-            JsonNode tm = s.path("time").path("data");
-            if (!hr.isArray() || !tm.isArray() || hr.size() == 0 || hr.size() != tm.size()) return null;
-            int end = tm.get(tm.size() - 1).asInt();
-            int lo = 120, hi = end - 120;
-            if (hi <= lo) return null; // nothing left after trimming
-            long sum = 0; int n = 0;
-            for (int i = 0; i < hr.size(); i++) {
-                int t = tm.get(i).asInt();
-                if (t < lo || t > hi) continue;
-                int h = hr.get(i).asInt();
-                if (h > 0) { sum += h; n++; }
+                    + "/streams?keys=time,heartrate,velocity_smooth,distance&key_by_type=true", token);
+            JsonNode tmN = s.path("time").path("data");
+            JsonNode hrN = s.path("heartrate").path("data");
+            JsonNode velN = s.path("velocity_smooth").path("data");
+            JsonNode distN = s.path("distance").path("data");
+            if (!tmN.isArray() || tmN.size() == 0) return new StreamResult(null, null, null);
+            int n = tmN.size();
+            int[] time = new int[n];
+            for (int i = 0; i < n; i++) time[i] = tmN.get(i).asInt();
+
+            Integer trimmed = null;
+            int[] hr = null;
+            if (hrN.isArray() && hrN.size() == n) {
+                hr = new int[n];
+                for (int i = 0; i < n; i++) hr[i] = hrN.get(i).asInt();
+                int end = time[n - 1], lo = 120, hi = end - 120;
+                if (hi > lo) {
+                    long sum = 0; int cnt = 0;
+                    for (int i = 0; i < n; i++) if (time[i] >= lo && time[i] <= hi && hr[i] > 0) { sum += hr[i]; cnt++; }
+                    if (cnt > 0) trimmed = (int) Math.round((double) sum / cnt);
+                }
             }
-            return n > 0 ? (int) Math.round((double) sum / n) : null;
+
+            List<DayLog.Rep> reps = null;
+            List<Double> speedSeries = null;
+            if (velN.isArray() && velN.size() == n) {
+                double[] vel = new double[n];
+                for (int i = 0; i < n; i++) vel[i] = velN.get(i).asDouble();
+                double[] dist = null;
+                if (distN.isArray() && distN.size() == n) {
+                    dist = new double[n];
+                    for (int i = 0; i < n; i++) dist[i] = distN.get(i).asDouble();
+                }
+                reps = RepDetector.detect(time, vel, hr, dist);
+                speedSeries = downsampleSpeed(time, vel, 10);
+            }
+            return new StreamResult(trimmed, reps, speedSeries);
         } catch (Exception e) {
-            return null; // no HR stream, private activity, etc. -> caller falls back
+            return new StreamResult(null, null, null); // no stream, private activity, etc.
         }
+    }
+
+    /** Average speed (m/s) per {@code bucketS}-second bucket; index i => t = i*bucketS. */
+    private static List<Double> downsampleSpeed(int[] time, double[] vel, int bucketS) {
+        int end = time[time.length - 1];
+        int buckets = end / bucketS + 1;
+        double[] sum = new double[buckets];
+        int[] cnt = new int[buckets];
+        for (int i = 0; i < time.length; i++) {
+            int b = time[i] / bucketS;
+            if (b < buckets) { sum[b] += Math.max(0, vel[i]); cnt[b]++; }
+        }
+        List<Double> out = new ArrayList<>(buckets);
+        for (int b = 0; b < buckets; b++)
+            out.add(cnt[b] > 0 ? Math.round(sum[b] / cnt[b] * 100) / 100.0 : 0.0);
+        return out;
     }
 
     // ---- tiny HTTP helpers ----
