@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import LogSession from "./pages/LogSession";
 import Analytics from "./pages/Analytics";
+import Strength from "./pages/Strength";
 import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
         <nav className="nav">
           <NavLink to="/" end>Home</NavLink>
           <NavLink to="/calendar">Calendar</NavLink>
+          <NavLink to="/strength">Strength</NavLink>
           <NavLink to="/analytics">Analytics</NavLink>
           <NavLink to="/settings">Settings</NavLink>
         </nav>
@@ -24,6 +26,7 @@ export default function App() {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/log/:date" element={<LogSession />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/strength" element={<Strength />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

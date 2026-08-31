@@ -63,6 +63,18 @@ export interface ReadinessResult {
   verdict: string; action: string;
 }
 
+export interface StrengthExercise {
+  key: string; name: string; dose: string; upperOnly: boolean; legLift: boolean; cues: string[];
+}
+export interface StrengthDaySlot {
+  day: string; runContext: string; gymType: "full" | "upper" | "none"; label: string; note: string;
+}
+export interface StrengthMilestone { weeks: string; target: string; }
+export interface StrengthProgram {
+  week: StrengthDaySlot[]; gym: StrengthExercise[]; mobility: StrengthExercise[];
+  desk: StrengthExercise[]; checklist: StrengthMilestone[];
+}
+
 export interface PaceProfilePoint { t: number; planned: number | null; actual: number | null; }
 export interface PaceProfile {
   date: string; title: string; hasActual: boolean; points: PaceProfilePoint[];

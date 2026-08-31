@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import type { DaySummary, ScoreResult, WeekSummary, GoalProjection } from "../lib/types";
+import type { DaySummary, ScoreResult, WeekSummary, GoalProjection, StrengthDaySlot } from "../lib/types";
 import {
   TODAY, fmtDate, fmtDur, shiftDate, relativeLabel, bandColor, bandLabel, paceFromKmMin,
 } from "../lib/format";
@@ -13,11 +13,11 @@ import WorkoutSteps from "../components/WorkoutSteps";
 type Summaries = Record<string, DaySummary | null>;
 
 function DayCard({
-  date, summary, focus, stravaConnected, syncing, syncMsg, onSync,
+  date, summary, focus, stravaConnected, syncing, syncMsg, onSync, gym,
 }: {
   date: string; summary: DaySummary | null | undefined; focus: boolean;
   stravaConnected: boolean; syncing: boolean; syncMsg?: string;
-  onSync: (date: string) => void;
+  onSync: (date: string) => void; gym?: StrengthDaySlot | null;
 }) {
   const [showSteps, setShowSteps] = useState(false);
   const label = relativeLabel(date);
@@ -97,6 +97,12 @@ function DayCard({
         )}
       </div>
 
+      {gym && gym.label !== "Off" && (
+        <div className="note" style={{ marginTop: 8, color: gym.gymType === "none" ? "#93a1b0" : "#7fb0e6" }}>
+          {gym.gymType === "none" ? "🧍" : "🏋"} {gym.label}
+        </div>
+      )}
+
       <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: "wrap" }}>
         <Link to={`/log/${date}`}><button className="ghost">{summary?.done || loggedReadiness ? "Edit" : "Log"}</button></Link>
         {planned && (
@@ -122,6 +128,7 @@ export default function Dashboard() {
   const [weeks, setWeeks] = useState<WeekSummary[]>([]);
   const [goal, setGoal] = useState<GoalProjection | null>(null);
   const [connected, setConnected] = useState(false);
+  const [gymWeek, setGymWeek] = useState<StrengthDaySlot[] | null>(null);
   const [anchor, setAnchor] = useState(TODAY);
   const [focusScore, setFocusScore] = useState<ScoreResult | null>(null);
   const [syncingDate, setSyncingDate] = useState<string | null>(null);
@@ -135,7 +142,12 @@ export default function Dashboard() {
     api.weekly().then(setWeeks).catch(() => {});
     api.goal(TODAY).then(setGoal).catch(() => {});
     api.stravaStatus().then((s) => setConnected(s.connected)).catch(() => {});
+    api.strength().then((s) => setGymWeek(s.week)).catch(() => {});
   }, []);
+
+  // Mon..Sun schedule indexed by weekday (JS getDay: 0=Sun..6=Sat).
+  const gymFor = (d: string): StrengthDaySlot | null =>
+    gymWeek ? gymWeek[(new Date(d + "T00:00:00").getDay() + 6) % 7] : null;
 
   // Fetch each visible date individually so off-plan days (not in the bulk plan) load too.
   function loadDate(d: string) {
@@ -225,6 +237,7 @@ export default function Dashboard() {
             syncing={syncingDate === d}
             syncMsg={syncMsg[d]}
             onSync={syncDay}
+            gym={gymFor(d)}
           />
         ))}
       </div>
