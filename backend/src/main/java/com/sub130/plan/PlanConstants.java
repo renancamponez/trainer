@@ -17,25 +17,25 @@ public final class PlanConstants {
 
     public static final String[] PHASE_NAMES = {"", "Base", "Strength", "Threshold", "Race-specific"};
 
-    // Training paces in SECONDS PER KM per phase. easy is {fast, slow}.
-    // Index by phase 1..4.
-    // Easy pace (sec/km) per phase, {fast, slow}. Recalibrated 15s faster than the original
-    // 6:10-6:40 base after the athlete's easy runs came in comfortably quicker; phase 1 is now
-    // 5:55-6:25 and every phase keeps its progressive step.
+    // Training paces in SECONDS PER KM per phase. easy is {fast, slow}. Index by phase 1..4.
+    //
+    // Recalibrated to the Aug-2026 5K time trial: 24:00 (4:48/km) => VDOT ~40. The earlier tables
+    // assumed a fitter athlete, so phase-1 workout paces were too quick. Paces now follow a VDOT
+    // progression across the four phases toward the sub-1:30 goal: P1=40 (now), P2=43, P3=46,
+    // P4=49-50. Daniels E/M/T/I paces map to easy/steady/thr/vo2; hmp is the fixed 4:16 goal-half
+    // pace; brace is the (revised) Sept-27 race pace of ~5:05/km for a realistic 1:47.
     public static int[] easy(int phase) { return EASY[phase]; }
     private static final int[][] EASY = {
-        null, {355, 385}, {345, 373}, {333, 357}, {325, 345}
+        null, {360, 396}, {342, 378}, {326, 360}, {310, 344}
     };
-    // steady, thr, vo2, hmp, brace  (seconds/km) by phase. Training paces recalibrated faster
-    // alongside the easy-pace change (fitter than first assumed): steady ~12s, threshold ~10s,
-    // VO2 ~8s quicker. hmp (goal 4:16) and brace (Sept-27 race target) are fixed targets, not
-    // fitness-derived, so they stay put.
+    // steady (marathon pace), thr (threshold), vo2 (interval), hmp (goal half), brace (Sept-27 race)
+    // in seconds/km by phase.
     public static final Map<String, int[]> PACE_SEC = Map.of(
-        "steady", new int[]{0, 310, 296, 280, 266},
-        "thr",    new int[]{0, 292, 278, 264, 252},
-        "vo2",    new int[]{0, 270, 257, 242, 232},
+        "steady", new int[]{0, 328, 309, 291, 277},
+        "thr",    new int[]{0, 306, 288, 272, 259},
+        "vo2",    new int[]{0, 282, 266, 250, 238},
         "hmp",    new int[]{0, 256, 256, 256, 256},
-        "brace",  new int[]{0, 294, 294, 294, 294}
+        "brace",  new int[]{0, 304, 304, 304, 304}
     );
 
     // HR zones as a fraction of LTHR (threshold HR), Friel-style.
@@ -189,26 +189,24 @@ public final class PlanConstants {
 
     /** week -> checkpoint race. */
     public static final Map<Integer, Checkpoint> CHECKPOINTS = Map.ofEntries(
-        Map.entry(6, new Checkpoint("Sat", "5K TIME TRIAL", 5.0, "23:00", 23 * 60,
-            "Post-travel fitness read - a 5K time trial or parkrun off training legs. On-track ~23:00; "
-          + "if the W2-W4 travel disrupted training, a slower read is fine and the outlook adjusts. It "
-          + "also tells you whether the recalibrated paces are right, and is the goal gauge's first real "
-          + "data point.")),
-        Map.entry(10, new Checkpoint("Sun", "SEPT 27 HALF MARATHON (B-race)", 21.1, "1:43:30", 103 * 60 + 30,
-            "Gate 1 + B-race, now with a proper ~10-day taper (W9 eased, W10 light) so you can actually "
-          + "race it. Target 1:43:30, stretch 1:41; under 1:45 says the engine is building. The taper "
-          + "trades a little sub-1:30 base for a strong race and a real fitness read - a fair deal for a "
-          + "B-race you care about.")),
-        Map.entry(20, new Checkpoint("Sat", "5K RACE", 5.0, "21:50", 21 * 60 + 50,
-            "Sharpness check, not a gate. Tells you the speed work is landing.")),
-        Map.entry(26, new Checkpoint("Sat", "10K RACE", 10.0, "44:00", 44 * 60,
-            "Gate 2 - the decision point. Sub-44:00 means the 12-month timeline is live. 45:30+ means "
-          + "commit to the 18-month version: repeat Phase 2 and push the goal race back. That is the "
-          + "expected outcome, not a failure.")),
-        Map.entry(39, new Checkpoint("Sun", "HALF MARATHON TUNE-UP", 21.1, "1:34:00", 94 * 60,
-            "Gate 3: dress rehearsal. Practise fuelling and pacing. 1:36+ means the goal is at risk.")),
-        Map.entry(46, new Checkpoint("Sat", "10K RACE", 10.0, "41:00", 41 * 60,
-            "Gate 4: sub-41:00 keeps sub-1:30 live. 40:15 or better makes it likely.")),
+        Map.entry(6, new Checkpoint("Sat", "5K TIME TRIAL", 5.0, "24:00", 24 * 60,
+            "Done: 24:00 (4:48/km), VDOT ~40. This is now the plan's baseline - every training pace "
+          + "is calibrated from it. A genuine, honest starting point off travel-disrupted legs.")),
+        Map.entry(10, new Checkpoint("Sun", "SEPT 27 HALF MARATHON (B-race)", 21.1, "1:47:00", 107 * 60,
+            "Realistic target from a 24:00 5K plus the wk7/wk9 long runs: 1:47:00 at ~5:05/km. Stretch "
+          + "sub-1:45 on a great day; conservative floor 1:50. Endurance is the limiter (longest runs "
+          + "are 12-19km, the race is 21.1), so hold 5:05-5:10 the first half and don't chase - fade in "
+          + "the back third costs far more than a slightly conservative start saves.")),
+        Map.entry(20, new Checkpoint("Sat", "5K RACE", 5.0, "22:40", 22 * 60 + 40,
+            "Sharpness check (VDOT ~43). Tells you the phase-2 speed work is landing.")),
+        Map.entry(26, new Checkpoint("Sat", "10K RACE", 10.0, "46:30", 46 * 60 + 30,
+            "Gate 2 - the decision point (VDOT ~44). Sub-46:30 keeps the 12-month timeline live. 48:00+ "
+          + "means commit to the 18-month version: repeat Phase 2 and push the goal race back. That is a "
+          + "likely, sensible outcome from a VDOT-40 start, not a failure.")),
+        Map.entry(39, new Checkpoint("Sun", "HALF MARATHON TUNE-UP", 21.1, "1:35:30", 95 * 60 + 30,
+            "Gate 3: dress rehearsal (VDOT ~47). Practise fuelling and pacing. 1:38+ means the goal is at risk.")),
+        Map.entry(46, new Checkpoint("Sat", "10K RACE", 10.0, "42:00", 42 * 60,
+            "Gate 4: sub-42:00 keeps sub-1:30 live (VDOT ~48). 41:00 or better makes it likely.")),
         Map.entry(52, new Checkpoint("Sun", "GOAL HALF MARATHON", 21.1, "sub 1:30:00", 5399,
             "Race day. 4:16/km = 8.7 mph. Go get it."))
     );
