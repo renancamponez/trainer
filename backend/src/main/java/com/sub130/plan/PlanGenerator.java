@@ -18,6 +18,10 @@ public final class PlanGenerator {
     private static final Pattern PACE_TOKEN = Pattern.compile("\\d:\\d{2}");
     private static final Pattern PER_KM = Pattern.compile("(\\d:\\d{2})/km");
     private static final Pattern ZONE = Pattern.compile("\\{(\\w+?)([+-]\\d+)?\\}");
+    // Structured work parsed to compute the true session distance/duration.
+    private static final Pattern INTERVAL = Pattern.compile("(\\d+)\\s*x\\s*(\\d+(?:\\.\\d+)?)\\s*(min|km|m)\\b\\s*@\\s*(\\d:\\d{2})/km");
+    private static final Pattern RECOVERY = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(s|min|m)\\s*jog");
+    private static final Pattern SINGLE = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*min\\s*@\\s*(\\d:\\d{2})/km");
     private static final double MI_PER_KM = 1.609344;
 
     // ---- small numeric helpers (match Python semantics) ----
@@ -106,10 +110,64 @@ public final class PlanGenerator {
         String dayName, type, desc, pace, raw;
         double km;
         double wuKm, cdKm, raceSec, raceDist;
+        double mainMin;   // exact minutes for the structured main set (0 = fall back to the blend estimate)
         Day(String d, String t) { dayName = d; type = t; }
     }
 
     private static double[] wuCd(double km) { return new double[]{ km <= 8 ? 2 : 3, 2 }; }
+
+    private static double round1(double v) { return Math.round(v * 10) / 10.0; }
+
+    /**
+     * True distance (km) and duration (min) of a structured main set — reps plus the jog
+     * recoveries between them — parsed from the resolved session text. Returns null for
+     * sessions with no structured reps (easy + strides, hill sprints), whose distance stays
+     * the volume-based allocation. This is what makes e.g. "3 x 3km" count as ~9.6 km of work
+     * rather than a flat 15%-of-week guess.
+     */
+    private static double[] structuredMain(String desc, int phase) {
+        double em = easyMid(phase);
+        double km = 0, sec = 0;
+        Matcher iv = INTERVAL.matcher(desc);
+        if (iv.find()) {
+            int n = Integer.parseInt(iv.group(1));
+            double amt = Double.parseDouble(iv.group(2));
+            String unit = iv.group(3);
+            int pace = paceToSec(iv.group(4));
+            double repDist, repDur;
+            if (unit.equals("min")) { repDur = amt * 60; repDist = repDur / pace; }
+            else if (unit.equals("km")) { repDist = amt; repDur = amt * pace; }
+            else { repDist = amt / 1000.0; repDur = repDist * pace; }   // metres
+            km += n * repDist; sec += n * repDur;
+
+            Matcher rec = RECOVERY.matcher(desc);
+            if (n > 1 && rec.find()) {
+                double rv = Double.parseDouble(rec.group(1));
+                double recDist, recDur;
+                switch (rec.group(2)) {
+                    case "min" -> { recDur = rv * 60; recDist = recDur / em; }
+                    case "m"   -> { recDist = rv / 1000.0; recDur = recDist * em; }
+                    default     -> { recDur = rv; recDist = recDur / em; }   // seconds
+                }
+                km += (n - 1) * recDist; sec += (n - 1) * recDur;
+            }
+        } else {
+            Matcher sg = SINGLE.matcher(desc);
+            if (!sg.find()) return null;                 // no structured set
+            double amt = Double.parseDouble(sg.group(1));
+            int pace = paceToSec(sg.group(2));
+            sec += amt * 60; km += amt * 60 / pace;
+        }
+        return new double[]{km, sec / 60.0};
+    }
+
+    /** If the day carries a structured main set, replace its allocated km/min with the real ones. */
+    private static void applyStructured(Day d, int phase) {
+        double[] m = structuredMain(d.desc, phase);
+        if (m == null) return;
+        d.mainMin = m[1];
+        d.km = round1(d.wuKm + d.cdKm + m[0]);
+    }
 
     private static String hrZoneOf(Day d) {
         if (d.type.equals("Rest")) return null;
@@ -129,6 +187,8 @@ public final class PlanGenerator {
         if (d.type.equals("Rest") || d.km == 0) return 0;
         if (d.type.equals("RACE")) return d.raceSec / 60 + (d.wuKm + d.cdKm) * em / 60;
         if (d.type.equals("Easy") || d.type.equals("Long")) return d.km * em / 60;
+        // Structured workout: warm-up/cool-down at easy + the exact main-set minutes.
+        if (d.mainMin > 0) return (d.wuKm + d.cdKm) * em / 60 + d.mainMin;
         double wu = d.wuKm, cd = d.cdKm, main = Math.max(d.km - wu - cd, 0);
         Integer ws = workSec(d.raw);
         String up = d.raw.toUpperCase();
@@ -163,6 +223,7 @@ public final class PlanGenerator {
         tue.desc = resolve(W1.get(week), p); tue.km = aKm;
         tue.pace = "warmup/cooldown @ " + easyStr;
         double[] awc = wuCd(aKm); tue.wuKm = awc[0]; tue.cdKm = awc[1];
+        applyStructured(tue, p);
         days.put("Tue", tue);
 
         long mon, wed, fri;
@@ -171,6 +232,7 @@ public final class PlanGenerator {
             thu.desc = resolve(W2.get(week), p); thu.km = bKm;
             thu.pace = "warmup/cooldown @ " + easyStr;
             double[] bwc = wuCd(bKm); thu.wuKm = bwc[0]; thu.cdKm = bwc[1];
+            applyStructured(thu, p);
             days.put("Thu", thu);
 
             Day sat = new Day("Sat", "Long");
@@ -178,7 +240,9 @@ public final class PlanGenerator {
             sat.km = longKm; sat.pace = easyStr;
             days.put("Sat", sat);
 
-            long pool = pyRound(vol - (longKm + aKm + bKm));
+            // Easy days absorb the remainder of the weekly target after the (now true) workout
+            // and long-run distances, so the week still totals VOLUME. Floor keeps them runnable.
+            long pool = Math.max(pyRound(vol - (longKm + tue.km + thu.km)), 9);
             if (monRest) { mon = 0; wed = pyRound(pool * 0.60); fri = pool - wed; }
             else { mon = pyRound(pool * 0.38); wed = pyRound(pool * 0.37); fri = pool - mon - wed; }
         } else {
@@ -194,9 +258,10 @@ public final class PlanGenerator {
             Day thu = new Day("Thu", "Workout");
             thu.desc = resolve(W2.get(week), p); thu.km = bKm;
             thu.pace = "warmup/cooldown @ " + easyStr; thu.wuKm = 2; thu.cdKm = 2;
+            applyStructured(thu, p);
             days.put("Thu", thu);
 
-            double fixed = raceKm + aKm + bKm + 5.0;
+            double fixed = raceKm + tue.km + thu.km + 5.0;
             long pool = pyRound(Math.max(vol - fixed, 8));
             if (cp.day.equals("Sat")) {
                 mon = pyRound(pool * 0.55); wed = pool - mon; fri = 5;
