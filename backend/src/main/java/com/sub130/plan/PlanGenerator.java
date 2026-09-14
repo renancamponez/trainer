@@ -219,32 +219,34 @@ public final class PlanGenerator {
         sun.desc = "REST DAY - no running. Mobility/stretching optional."; sun.pace = "-";
         days.put("Sun", sun);
 
-        Day tue = new Day("Tue", "Workout");
-        tue.desc = resolve(W1.get(week), p); tue.km = aKm;
-        tue.pace = "warmup/cooldown @ " + easyStr;
-        double[] awc = wuCd(aKm); tue.wuKm = awc[0]; tue.cdKm = awc[1];
-        applyStructured(tue, p);
-        days.put("Tue", tue);
+        // Two quality sessions: W1 (primary) and W2 (secondary), placed on Monday and Wednesday so
+        // Tuesday and Thursday stay easy (the athlete does a Core 45 class those days). Friday stays
+        // easy to protect Saturday's long run.
+        Day w1 = workoutDay(W1.get(week), p, aKm, easyStr);
+        Day w2 = workoutDay(W2.get(week), p, bKm, easyStr);
 
-        long mon, wed, fri;
+        long tue, thu, fri;
         if (cp == null) {
-            Day thu = new Day("Thu", "Workout");
-            thu.desc = resolve(W2.get(week), p); thu.km = bKm;
-            thu.pace = "warmup/cooldown @ " + easyStr;
-            double[] bwc = wuCd(bKm); thu.wuKm = bwc[0]; thu.cdKm = bwc[1];
-            applyStructured(thu, p);
-            days.put("Thu", thu);
-
             Day sat = new Day("Sat", "Long");
             sat.desc = resolve(SPECIAL_LONG.getOrDefault(week, "Long run - conversational the whole way"), p);
             sat.km = longKm; sat.pace = easyStr;
             days.put("Sat", sat);
 
-            // Easy days absorb the remainder of the weekly target after the (now true) workout
-            // and long-run distances, so the week still totals VOLUME. Floor keeps them runnable.
-            long pool = Math.max(pyRound(vol - (longKm + tue.km + thu.km)), 9);
-            if (monRest) { mon = 0; wed = pyRound(pool * 0.60); fri = pool - wed; }
-            else { mon = pyRound(pool * 0.38); wed = pyRound(pool * 0.37); fri = pool - mon - wed; }
+            if (monRest) {
+                // Raced Sunday: Monday rests, a single quality session (W1) mid-week on Wednesday.
+                Day monR = new Day("Mon", "Rest");
+                monR.desc = "EXTRA REST DAY - you raced yesterday. Walk if you like; do not run."; monR.pace = "-";
+                days.put("Mon", monR);
+                w1.dayName = "Wed"; days.put("Wed", w1);
+                long pool = Math.max(pyRound(vol - (longKm + w1.km)), 9);
+                tue = pyRound(pool * 0.38); thu = pyRound(pool * 0.34); fri = pool - tue - thu;
+            } else {
+                w1.dayName = "Mon"; days.put("Mon", w1);
+                w2.dayName = "Wed"; days.put("Wed", w2);
+                // Easy days (Tue/Thu/Fri) absorb the remainder so the week still totals VOLUME.
+                long pool = Math.max(pyRound(vol - (longKm + w1.km + w2.km)), 9);
+                tue = pyRound(pool * 0.37); thu = pyRound(pool * 0.37); fri = pool - tue - thu;
+            }
         } else {
             double wu = cp.distKm > 15 ? 1 : 2;
             double raceKm = cp.distKm + 2 * wu;
@@ -255,16 +257,13 @@ public final class PlanGenerator {
             race.wuKm = wu; race.cdKm = wu; race.raceSec = cp.targetSec; race.raceDist = cp.distKm;
             days.put(cp.day, race);
 
-            Day thu = new Day("Thu", "Workout");
-            thu.desc = resolve(W2.get(week), p); thu.km = bKm;
-            thu.pace = "warmup/cooldown @ " + easyStr; thu.wuKm = 2; thu.cdKm = 2;
-            applyStructured(thu, p);
-            days.put("Thu", thu);
+            w1.dayName = "Mon"; days.put("Mon", w1);
+            w2.dayName = "Wed"; days.put("Wed", w2);
 
-            double fixed = raceKm + tue.km + thu.km + 5.0;
+            double fixed = raceKm + w1.km + w2.km + 5.0;
             long pool = pyRound(Math.max(vol - fixed, 8));
             if (cp.day.equals("Sat")) {
-                mon = pyRound(pool * 0.55); wed = pool - mon; fri = 5;
+                tue = pyRound(pool * 0.5); thu = pool - tue; fri = 4;   // Friday short - race tomorrow
             } else { // Sunday race: Friday rest, Saturday shakeout
                 Day frid = new Day("Fri", "Rest");
                 frid.desc = "REST DAY - two days out from the race. Stay off your feet."; frid.pace = "-";
@@ -272,30 +271,35 @@ public final class PlanGenerator {
                 Day sat = new Day("Sat", "Easy");
                 sat.desc = "Easy shakeout + 4 x 100m strides - race tomorrow"; sat.km = 5; sat.pace = easyStr;
                 days.put("Sat", sat);
-                mon = pyRound(pool * 0.55); wed = pool - mon; fri = 0;
+                tue = pyRound(pool * 0.5); thu = pool - tue; fri = 0;
             }
         }
 
-        Day monD = new Day("Mon", "Easy");
-        monD.desc = "Easy run - strength session afterwards (20-30min)"; monD.km = mon; monD.pace = easyStr;
-        days.put("Mon", monD);
-        Day wedD = new Day("Wed", "Easy");
-        wedD.desc = "Easy run - strength session afterwards (20-30min)"; wedD.km = wed; wedD.pace = easyStr;
-        days.put("Wed", wedD);
+        Day tueD = new Day("Tue", "Easy");
+        tueD.desc = "Easy run - easy aerobic day (Core 45 / cross-training)"; tueD.km = tue; tueD.pace = easyStr;
+        days.put("Tue", tueD);
+        Day thuD = new Day("Thu", "Easy");
+        thuD.desc = "Easy run - easy aerobic day (Core 45 / cross-training)"; thuD.km = thu; thuD.pace = easyStr;
+        days.put("Thu", thuD);
         if (!days.containsKey("Fri")) {
             Day friD = new Day("Fri", "Easy");
             friD.desc = "Easy run - keep it short and gentle, long run tomorrow"; friD.km = fri; friD.pace = easyStr;
             days.put("Fri", friD);
         }
-        if (monRest) {
-            Day r = new Day("Mon", "Rest");
-            r.desc = "EXTRA REST DAY - you raced yesterday. Walk if you like; do not run."; r.pace = "-";
-            days.put("Mon", r);
-        }
 
         List<Day> out = new ArrayList<>();
         for (String dn : DAY_NAMES) out.add(days.get(dn));
         return out;
+    }
+
+    /** A quality session from its template: resolves paces, sizes warm-up/cool-down and the true main set. */
+    private static Day workoutDay(String template, int p, long km, String easyStr) {
+        Day d = new Day("", "Workout");
+        d.desc = resolve(template, p); d.km = km;
+        d.pace = "warmup/cooldown @ " + easyStr;
+        double[] wc = wuCd(km); d.wuKm = wc[0]; d.cdKm = wc[1];
+        applyStructured(d, p);
+        return d;
     }
 
     private static List<Day> buildWeek0() {

@@ -83,14 +83,14 @@ public class StrengthService {
     );
 
     private static final List<DaySlot> WEEK = List.of(
-        new DaySlot("Mon", "Easy run", "none", "Desk routine only",
-            "Recovery from Saturday's long run — keep it easy, no gym."),
-        new DaySlot("Tue", "Quality run", "full", "Full gym + mobility",
-            "Leg lifting lands on a hard day so Wednesday can recover. Run first, lift after."),
-        new DaySlot("Wed", "Easy run", "none", "Desk routine only",
-            "Easy day stays easy — legs recovering from Tuesday."),
-        new DaySlot("Thu", "Quality run", "full", "Full gym + mobility",
-            "Second full session; legs recover on Friday's easy run."),
+        new DaySlot("Mon", "Quality run", "full", "Full gym + mobility",
+            "Leg lifting lands on a hard day (fresh off Sunday's rest); Tuesday is easy so legs recover. Run first, lift after."),
+        new DaySlot("Tue", "Easy run", "none", "Core 45 + desk routine",
+            "Your Core 45 class covers the core work here — keep the run easy and skip the posture gym."),
+        new DaySlot("Wed", "Quality run", "full", "Full gym + mobility",
+            "Second full session on the other quality day; legs recover on Thursday's easy run."),
+        new DaySlot("Thu", "Easy run", "none", "Core 45 + desk routine",
+            "Core 45 again — easy run only, no posture gym."),
         new DaySlot("Fri", "Easy run", "upper", "Upper + core (no leg lifts) + mobility",
             "Split squat and RDL dropped here to keep Saturday's long run fresh."),
         new DaySlot("Sat", "Long run", "none", "Desk routine only",
