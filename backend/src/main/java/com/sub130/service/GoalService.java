@@ -106,15 +106,26 @@ public class GoalService {
         for (PlannedSession s : plan) {
             if (!s.checkpoint || s.date.compareTo(asOfStr) > 0) continue;   // include today if raced
             PlanConstants.Checkpoint cp = PlanConstants.CHECKPOINTS.get(s.week);
-            DayLog log = logs.get(s.date);
-            if (cp == null || log == null || !log.done || log.actualKm == null
-                    || log.actualMinutes == null || log.actualKm <= 0) continue;
-            double measuredPace = log.actualMinutes * 60.0 / log.actualKm;   // s/km
+            if (cp == null) continue;
+            // A solo time trial is often run a few days off the scheduled date, and the run logged
+            // on the exact day may just be an easy jog. So take the best (fastest) effort near the
+            // checkpoint's distance within a window around it, rather than only the exact-date run.
+            String winStart = LocalDate.parse(s.date).minusDays(28).toString();
+            DayLog best = null; double bestPace = Double.MAX_VALUE;
+            for (DayLog l : logs.values()) {
+                if (l == null || !l.done || l.actualKm == null || l.actualMinutes == null || l.actualKm <= 0) continue;
+                if (l.date.compareTo(winStart) < 0 || l.date.compareTo(asOfStr) > 0) continue;
+                if (l.actualKm < cp.distKm * 0.90 || l.actualKm > cp.distKm * 1.12) continue;   // ~same distance
+                double pace = l.actualMinutes * 60.0 / l.actualKm;
+                if (pace < bestPace) { bestPace = pace; best = l; }
+            }
+            if (best == null) continue;
+            double measuredPace = bestPace;                                  // s/km of the best effort
             double targetPace = cp.targetSec / cp.distKm;
             double ratio = targetPace / measuredPace;                        // >1 = faster than target
             ratios.add(ratio);
-            lastCpEqHalf = riegelHalf(cp.distKm, measuredPace * cp.distKm);
-            lastCpDetail = cp.label + ": " + fmt(measuredPace * cp.distKm) + " vs " + cp.targetLabel + " target ("
+            lastCpEqHalf = riegelHalf(best.actualKm, measuredPace * best.actualKm);
+            lastCpDetail = cp.label + ": " + fmt(measuredPace * best.actualKm) + " vs " + cp.targetLabel + " target ("
                     + (ratio >= 1 ? "ahead" : "behind") + ")";
         }
         double checkpointMult = ratios.isEmpty() ? 1.0
