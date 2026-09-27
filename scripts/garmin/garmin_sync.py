@@ -4,7 +4,8 @@ Pull morning readiness from Garmin Connect into the sub130 database:
 overnight HRV (last-night average, ms), resting HR and sleep score (0-100).
 
 Runs on GitHub Actions a few times a day (.github/workflows/garmin-sync.yml) and
-re-reads the last 7 days each time, so a missed morning fills itself in. It only
+re-reads the last 7 days each time (plus any day in the last 5 weeks with no HRV yet),
+so a missed morning fills itself in and the HRV baseline always has history. It only
 ever sets the three readiness fields - run data and its Strava source are untouched.
 
     garmin_sync.py --login     one-time Garmin sign-in on your laptop; copies the session
@@ -29,7 +30,8 @@ warnings.filterwarnings("ignore")  # macOS LibreSSL notice from urllib3
 import garth
 
 LOCAL_TZ = ZoneInfo("America/Denver")   # Fort Collins: "today" is the athlete's morning, not UTC
-DAYS_BACK = 7
+DAYS_BACK = 7          # always refreshed
+BACKFILL_DAYS = 35     # older days are fetched only if they have no HRV yet (keeps baselines full)
 
 
 def login():
@@ -91,10 +93,15 @@ def sync(dry_run=False):
         db = MongoClient(os.environ["MONGODB_URI"], serverSelectionTimeoutMS=20000)["sub130"]
 
     today = dt.datetime.now(LOCAL_TZ).date()
-    print(f"--- sync for {user}, {today} (America/Denver) ---")
+    days = [today - dt.timedelta(days=i) for i in range(DAYS_BACK)]
+    if db is not None:
+        older = [today - dt.timedelta(days=i) for i in range(DAYS_BACK, BACKFILL_DAYS)]
+        have = {d["_id"] for d in db.daylogs.find(
+            {"_id": {"$in": [d.isoformat() for d in older]}, "hrvMs": {"$ne": None}}, {"_id": 1})}
+        days += [d for d in older if d.isoformat() not in have]
+    print(f"--- sync for {user}, {today} (America/Denver), {len(days)} day(s) ---")
     found = 0
-    for i in range(DAYS_BACK):
-        day = today - dt.timedelta(days=i)
+    for day in days:
         vals = readiness(day, user)
         if not vals:
             print(f"{day}  no Garmin data yet")

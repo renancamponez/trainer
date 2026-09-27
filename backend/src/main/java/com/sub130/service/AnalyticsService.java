@@ -22,13 +22,16 @@ public class AnalyticsService {
     private final DayLogRepository logRepo;
     private final ReadinessService readinessService;
     private final ScoreService scoreService;
+    private final DailySessionService dailySessionService;
 
     public AnalyticsService(PlanService planService, DayLogRepository logRepo,
-                            ReadinessService readinessService, ScoreService scoreService) {
+                            ReadinessService readinessService, ScoreService scoreService,
+                            DailySessionService dailySessionService) {
         this.planService = planService;
         this.logRepo = logRepo;
         this.readinessService = readinessService;
         this.scoreService = scoreService;
+        this.dailySessionService = dailySessionService;
     }
 
     public DaySummary summaryFor(String date) {
@@ -39,7 +42,8 @@ public class AnalyticsService {
         if (p == null) {                                // off-plan day, but data was logged
             return merge(offDay(date), log, r, null);
         }
-        ScoreResult sc = log == null ? null : scoreService.score(log);
+        p = dailySessionService.adjust(p, r);           // the session as adjusted by this morning's readiness
+        ScoreResult sc = log == null ? null : scoreService.score(log, p);
         return merge(p, log, r, sc);
     }
 
@@ -70,15 +74,19 @@ public class AnalyticsService {
         for (PlannedSession p : planService.all()) {
             if (p.date.compareTo(start) < 0 || p.date.compareTo(end) > 0) continue;
             DayLog log = logs.get(p.date);
-            ScoreResult sc = log == null ? null : scoreService.score(log);
-            out.add(merge(p, log, ready.get(p.date), sc));
+            PlannedSession eff = dailySessionService.adjust(p, ready.get(p.date));
+            ScoreResult sc = log == null ? null : scoreService.score(log, eff);
+            out.add(merge(eff, log, ready.get(p.date), sc));
         }
         out.sort((a, b) -> a.date().compareTo(b.date()));
         return out;
     }
 
     public List<WeekSummary> weekly() {
-        List<PlannedSession> all = planService.all();
+        List<PlannedSession> base = planService.all();
+        Map<String, PlannedSession> eff = dailySessionService.effectiveRange(
+                base.get(0).date, base.get(base.size() - 1).date);
+        List<PlannedSession> all = base.stream().map(p -> eff.getOrDefault(p.date, p)).toList();
         Map<String, DayLog> logs = new HashMap<>();
         for (DayLog l : logRepo.findAllByOrderByDateAsc()) logs.put(l.date, l);
 
@@ -98,7 +106,7 @@ public class AnalyticsService {
                 if (log != null && log.done) {
                     done++;
                     if (log.actualKm != null) actualKm += log.actualKm;
-                    ScoreResult sc = scoreService.score(log);
+                    ScoreResult sc = scoreService.score(log, p);
                     if (sc.score() != null) { scoreSum += sc.score(); scoreCount++; }
                 }
             }
@@ -128,10 +136,11 @@ public class AnalyticsService {
                 r == null ? null : r.load(),
                 r == null ? null : r.acwr(),
                 r == null ? null : r.verdict(),
-                r == null ? null : r.action(),
+                p.adjustmentNote != null ? p.adjustmentNote : (r == null ? null : r.action()),
                 sc == null ? null : sc.score(),
                 sc == null ? null : sc.grade(),
-                sc == null ? null : sc.headline());
+                sc == null ? null : sc.headline(),
+                p.adjustment, p.adjustmentNote, p.originalSession, p.originalKm);
     }
 
     private static Double round1(double x) { return Math.round(x * 10) / 10.0; }

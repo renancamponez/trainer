@@ -9,5 +9,7 @@ public record DaySummary(
         boolean done, String source, Double actualKm, Integer actualMinutes, Integer avgHr, String notes,
         Double hrvMs, Integer restingHr, Integer sleepScore, Integer readinessScore,
         Integer hrvPctOfBase, Double load, Double acwr, String verdict, String readinessAction,
-        Double score, String grade, String scoreHeadline
+        Double score, String grade, String scoreHeadline,
+        // Set when that morning's readiness changed the session (TRIMMED | EASY | REST).
+        String adjustment, String adjustmentNote, String originalSession, Double originalKm
 ) {}

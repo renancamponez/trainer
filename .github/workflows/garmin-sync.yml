@@ -1,28 +1,41 @@
-# Pulls overnight HRV, resting HR and sleep score from Garmin Connect into the app's
-# database every day. Needs two repo secrets: GARMIN_TOKENS (from scripts/garmin/setup.sh)
-# and MONGODB_URI (same value as on Render). Run it by hand from the Actions tab any time.
+# Pulls overnight HRV, resting HR and sleep score from Garmin Connect into the app's database,
+# and wakes the Render app so it's ready at 7:30. Needs two repo secrets: GARMIN_TOKENS (from
+# scripts/garmin/setup.sh) and MONGODB_URI (same value as on Render). The app also starts this
+# workflow itself when you open it and today's readiness hasn't arrived yet.
 name: garmin-sync
 
 on:
   schedule:
-    # UTC. Fort Collins is UTC-6 in summer / UTC-7 in winter, so roughly 7-8 am, 10-11 am,
-    # 1-2 pm and 7-8 pm local - several passes in case the watch syncs late.
-    - cron: "0 14 * * *"
-    - cron: "30 16 * * *"
-    - cron: "30 19 * * *"
-    - cron: "0 2 * * *"
+    # UTC. Fort Collins is UTC-6 in summer (MDT) and UTC-7 in winter (MST); both sets are kept so
+    # there are always runs at ~7:07, 7:17 and 7:27 local. Off-the-hour minutes start more reliably.
+    - cron: "7 13 * * *"
+    - cron: "17 13 * * *"
+    - cron: "27 13 * * *"
+    - cron: "7 14 * * *"
+    - cron: "17 14 * * *"
+    - cron: "27 14 * * *"
+    - cron: "37 16 * * *"    # late-morning catch-up if the watch synced late
+    - cron: "7 2 * * *"      # evening
   workflow_dispatch:
+
+concurrency:
+  group: garmin-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Wake the app (Render free tier sleeps after 15 min)
+        run: curl -fsS --max-time 90 https://sub130.onrender.com/api/health || true
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -q garth pymongo
+          cache: pip
+          cache-dependency-path: scripts/garmin/requirements.txt
+      - run: pip install -q -r scripts/garmin/requirements.txt
       - run: python scripts/garmin/garmin_sync.py
         env:
           GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}

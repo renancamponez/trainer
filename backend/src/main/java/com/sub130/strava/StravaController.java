@@ -68,6 +68,19 @@ public class StravaController {
     }
 
     /** Sync just one day's activity from Strava. */
+    /** Called by the app on open: quietly import the last 3 days of runs (throttled). */
+    @PostMapping("/sync-recent")
+    public Map<String, Object> syncRecent() {
+        if (!strava.isConnected()) return Map.of("status", "not-connected");
+        try {
+            var days = strava.syncRecent(3);
+            if (days == null) return Map.of("status", "recently-synced");
+            return Map.of("status", "synced", "imported", days.size(), "days", days);
+        } catch (Exception e) {
+            return Map.of("status", "error", "message", String.valueOf(e.getMessage()));
+        }
+    }
+
     @PostMapping("/sync/{date}")
     public ResponseEntity<?> syncDate(@PathVariable String date) {
         if (!strava.isConnected())

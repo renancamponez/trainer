@@ -106,6 +106,16 @@ public final class PlanGenerator {
 
     private static double easyMid(int p) { int[] e = easy(p); return (e[0] + e[1]) / 2.0; }
 
+    // ---- public helpers so a readiness adjustment can re-size and re-render a session exactly
+    // the way the generator does ----
+    public static String annotateSession(String raw) { return annotate(raw); }
+    /** {km, minutes} of a structured workout (warm-up + main set + cool-down); null if unstructured. */
+    public static double[] estimateWorkout(String raw, double wuKm, double cdKm, int phase) {
+        double[] m = structuredMain(raw, phase);
+        if (m == null) return null;
+        return new double[]{ round1(wuKm + cdKm + m[0]), (wuKm + cdKm) * easyMid(phase) / 60 + m[1] };
+    }
+
     // ---- mutable working record during construction ----
     private static final class Day {
         String dayName, type, desc, pace, raw;

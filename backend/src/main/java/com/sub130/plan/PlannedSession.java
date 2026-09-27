@@ -25,5 +25,22 @@ public class PlannedSession {
     public String incline;
     public boolean checkpoint;
 
+    // Set only when the morning's readiness changed the day (see DailySessionService).
+    public String adjustment;       // TRIMMED | EASY | REST
+    public String adjustmentNote;   // why, in plain words
+    public String originalSession;  // the session as planned
+    public Double originalKm;
+
     public PlannedSession() {}
+
+    public PlannedSession copy() {
+        PlannedSession c = new PlannedSession();
+        c.week = week; c.date = date; c.dayName = dayName; c.phase = phase; c.phaseName = phaseName;
+        c.type = type; c.session = session; c.rawSession = rawSession; c.warmup = warmup; c.cooldown = cooldown;
+        c.plannedKm = plannedKm; c.estMinutes = estMinutes; c.paceRange = paceRange; c.mphRange = mphRange;
+        c.hrZone = hrZone; c.targetHrBpm = targetHrBpm; c.incline = incline; c.checkpoint = checkpoint;
+        c.adjustment = adjustment; c.adjustmentNote = adjustmentNote;
+        c.originalSession = originalSession; c.originalKm = originalKm;
+        return c;
+    }
 }

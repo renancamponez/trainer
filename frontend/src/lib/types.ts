@@ -18,6 +18,9 @@ export interface DaySummary {
   hrvPctOfBase: number | null; load: number | null; acwr: number | null;
   verdict: string | null; readinessAction: string | null;
   score: number | null; grade: string | null; scoreHeadline: string | null;
+  // Set when that morning's readiness changed the session.
+  adjustment: "TRIMMED" | "EASY" | "REST" | null; adjustmentNote: string | null;
+  originalSession: string | null; originalKm: number | null;
 }
 
 export interface WeekSummary {

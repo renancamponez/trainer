@@ -27,6 +27,7 @@ export const api = {
   workout: (date: string) => req<WorkoutDetail>(`/plan/workout/${date}`),
   profile: (date: string) => req<PaceProfile>(`/plan/profile/${date}`),
   strength: () => req<StrengthProgram>(`/strength`),
+  garminSync: () => req<{ status: string }>(`/garmin/sync`, { method: "POST" }),
   strengthDay: (date: string) => req<StrengthDaySlot>(`/strength/day/${date}`),
 
   getLog: (date: string) => req<DayLog | null>(`/logs/${date}`).catch(() => null),
@@ -40,6 +41,7 @@ export const api = {
 
   stravaStatus: () => req<StravaStatus>(`/strava/status`),
   stravaSync: () => req<StravaSyncResult>(`/strava/sync`, { method: "POST" }),
+  stravaSyncRecent: () => req<{ status: string; imported?: number }>(`/strava/sync-recent`, { method: "POST" }),
   stravaSyncDate: (date: string) => req<StravaSyncResult>(`/strava/sync/${date}`, { method: "POST" }),
   stravaDisconnect: () => req<void>(`/strava/disconnect`, { method: "POST" }),
   stravaConfig: () => req<StravaConfigView>(`/strava/config`),

@@ -163,6 +163,26 @@ public class StravaService {
         return t.accessToken;
     }
 
+    private volatile Instant lastRecentSync = Instant.EPOCH;
+
+    /**
+     * Auto-sync on app open: import runs from the last few days (throttled to once every 10 min).
+     * Returns null when skipped because a recent sync already ran.
+     */
+    public synchronized List<ImportedDay> syncRecent(int days) {
+        Instant now = Instant.now();
+        if (now.isBefore(lastRecentSync.plusSeconds(600))) return null;
+        String token = validAccessToken();
+        long after = now.getEpochSecond() - (days + 1) * 86400L;      // +1 day covers the timezone offset
+        JsonNode arr = getJson(ACTIVITIES + "?after=" + after + "&per_page=50", token);
+        List<JsonNode> acts = new ArrayList<>();
+        if (arr.isArray()) arr.forEach(acts::add);
+        List<ImportedDay> imported = importActivities(acts, token, false);
+        lastRecentSync = now;
+        tokenRepo.findById(StravaToken.ID).ifPresent(t -> { t.lastSync = now.toString(); tokenRepo.save(t); });
+        return imported;
+    }
+
     /** Pull activities from plan start and import runs. Returns the days written. */
     public List<ImportedDay> sync() {
         String token = validAccessToken();

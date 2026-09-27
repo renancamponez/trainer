@@ -9,6 +9,7 @@ import { buildMetrics } from "../lib/metrics";
 import { VerdictBadge, TypeBadge, ScoreBadge, SourceBadge } from "../components/Badges";
 import GoalGauge from "../components/GoalGauge";
 import WorkoutSteps from "../components/WorkoutSteps";
+import ReadinessBanner from "../components/ReadinessBanner";
 
 type Summaries = Record<string, DaySummary | null>;
 
@@ -42,6 +43,8 @@ function DayCard({
         </div>
         <span className="muted" style={{ fontSize: 11 }}>{fmtDate(date)}</span>
       </div>
+
+      <ReadinessBanner s={summary} />
 
       {planned ? (
         <>
@@ -134,6 +137,8 @@ export default function Dashboard() {
   const [syncingDate, setSyncingDate] = useState<string | null>(null);
   const [syncMsg, setSyncMsg] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
+  // Morning readiness from Garmin: "waiting" while a sync runs, "late" if Garmin has nothing yet.
+  const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "done">("idle");
 
   const dates = useMemo(() => [shiftDate(anchor, -1), anchor, shiftDate(anchor, 1)], [anchor]);
 
@@ -143,7 +148,44 @@ export default function Dashboard() {
     api.goal(TODAY).then(setGoal).catch(() => {});
     api.stravaStatus().then((s) => setConnected(s.connected)).catch(() => {});
     api.strength().then((s) => setGymWeek(s.week)).catch(() => {});
+    // Auto-sync: pull the last few days of runs from Strava, then refresh what they change.
+    api.stravaSyncRecent().then((r) => {
+      if (r.status !== "synced" || !r.imported) return;
+      api.daySummary(TODAY).then(setToday).catch(() => {});
+      [shiftDate(TODAY, -1), TODAY, shiftDate(TODAY, 1)].forEach(loadDate);
+      api.weekly().then(setWeeks).catch(() => {});
+      api.goal(TODAY).then(setGoal).catch(() => {});
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If this morning's HRV / sleep haven't arrived, start a Garmin sync and watch for them, so the
+  // day's session re-adjusts on its own (fast polling for 4 min, then every minute for 30).
+  useEffect(() => {
+    if (!today || today.hrvMs != null || today.sleepScore != null || garmin !== "idle") return;
+    setGarmin("waiting");
+    api.garminSync().catch(() => {});
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () => {
+      api.daySummary(TODAY).then((s) => {
+        if (s && (s.hrvMs != null || s.sleepScore != null)) {
+          setToday(s);
+          setSummaries((p) => ({ ...p, [TODAY]: s }));
+          api.goal(TODAY).then(setGoal).catch(() => {});
+          setGarmin("done");
+          return;
+        }
+        const age = Date.now() - started;
+        if (age > 30 * 60_000) { setGarmin("late"); return; }
+        if (age > 4 * 60_000) setGarmin("late");
+        timer = setTimeout(poll, age > 4 * 60_000 ? 60_000 : 15_000);
+      }).catch(() => { timer = setTimeout(poll, 30_000); });
+    };
+    timer = setTimeout(poll, 15_000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today]);
 
   // Mon..Sun schedule indexed by weekday (JS getDay: 0=Sun..6=Sat).
   const gymFor = (d: string): StrengthDaySlot | null =>
@@ -194,6 +236,17 @@ export default function Dashboard() {
         {focus && focus.type !== "Off" ? `Week ${focus.week} · ${focus.phaseName} phase` : "Outside the plan window"}
       </p>
 
+      {garmin === "waiting" && (
+        <div className="note" style={{ marginBottom: 12 }}>
+          Pulling last night's HRV, resting HR and sleep from Garmin… today's session will update on its own.
+        </div>
+      )}
+      {garmin === "late" && (
+        <div className="note" style={{ marginBottom: 12 }}>
+          Garmin doesn't have last night's data yet. Open Garmin Connect on your phone to sync your watch —
+          this page keeps checking and updates today's session when it arrives.
+        </div>
+      )}
       {goal && <div style={{ marginBottom: 16 }}><GoalGauge goal={goal} /></div>}
 
       <div className="grid cols-3" style={{ marginBottom: 20 }}>

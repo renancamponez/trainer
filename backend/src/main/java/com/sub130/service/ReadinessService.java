@@ -12,17 +12,16 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
- * Autoregulation engine, ported from the spreadsheet's Readiness sheet.
+ * Morning readiness from HRV, resting HR and sleep score (synced daily from Garmin).
  *
- * All windows are CALENDAR-day windows (one row per day in the sheet), and blanks
- * are ignored exactly as AVERAGE/COUNT/SUM ignore empty cells:
- *   - HRV baseline : average of HRV over the prior 7 days (needs >=4 readings)
- *   - HRV % of base: today / baseline
- *   - Load         : distance run (km-based session load)
- *   - Acute load   : sum of load over the last 7 days
- *   - Chronic load : sum of load over the last 28 days / 4 (needs >=14 load-days)
- *   - ACWR         : acute / chronic
- *   - Verdict      : GREEN >=95% | AMBER 90-95% | RED <90%
+ * All windows are calendar-day windows; missing values are skipped:
+ *   - HRV / RHR baselines : average of the prior 7 days (need >=4 readings each)
+ *   - Sub-scores (0-1)    : HRV vs baseline (100% -> 1, 90% -> 0.5, <=80% -> 0), resting HR rise over
+ *                           baseline (+0 -> 1, >=+7 bpm -> 0), sleep score (85 -> 1, <=35 -> 0)
+ *   - Readiness 0-100     : weighted HRV 50 / RHR 30 / sleep 20 over whatever is present
+ *   - Verdict             : GREEN >=66 | AMBER 45-65 | RED <45
+ *   - Load / ACWR         : km-based acute (7 d) vs chronic (28 d / 4) load
+ * DailySessionService turns the verdict into the day's adjusted session.
  */
 @Service
 public class ReadinessService {
@@ -74,11 +73,12 @@ public class ReadinessService {
                 ? (int) Math.round(100 * hrv / hrvBase) : null;
 
         // Per-signal readiness sub-scores (0-1). Each only counts if its inputs exist.
-        //  HRV : ratio to baseline, 1.00 -> 1.0, 0.925 -> 0.5, <=0.85 -> 0
+        //  HRV : ratio to baseline, 1.00 -> 1.0, 0.90 -> 0.5, <=0.80 -> 0. Day-to-day HRV swings ~10%,
+        //        so one mildly low reading on its own shouldn't cancel a session.
         //  RHR : rise over baseline is bad; +0 -> 1.0, +3.5 -> 0.5, >=+7 -> 0
         //  Sleep: Garmin score (absolute); 85 -> 1.0, 60 -> 0.5, <=35 -> 0
         Double sHrv = (hrv != null && hrvBase != null && hrvBase > 0)
-                ? clamp((hrv / hrvBase - 0.85) / 0.15, 0, 1) : null;
+                ? clamp((hrv / hrvBase - 0.80) / 0.20, 0, 1) : null;
         Double sRhr = (rhr != null && rhrBase != null)
                 ? clamp(1 - Math.max(0, rhr - rhrBase) / 7.0, 0, 1) : null;
         Double sSleep = (sleep != null) ? clamp((sleep - 35) / 50.0, 0, 1) : null;

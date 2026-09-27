@@ -33,18 +33,18 @@ public class PaceProfileService {
     private static final Pattern SINGLE = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*min\\s*@\\s*(\\d:\\d{2})/km");
     private static final Pattern KM = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*km");
 
-    private final PlanService planService;
+    private final DailySessionService dailySessionService;
     private final DayLogRepository logRepo;
 
-    public PaceProfileService(PlanService planService, DayLogRepository logRepo) {
-        this.planService = planService;
+    public PaceProfileService(DailySessionService dailySessionService, DayLogRepository logRepo) {
+        this.dailySessionService = dailySessionService;
         this.logRepo = logRepo;
     }
 
     private record Seg(double dur, int pace) {}
 
     public PaceProfile build(String date) {
-        PlannedSession p = planService.forDate(date);
+        PlannedSession p = dailySessionService.effective(date);
         if (p == null || "Rest".equals(p.type) || "Off".equals(p.type))
             return new PaceProfile(date, "", false, List.of());
 

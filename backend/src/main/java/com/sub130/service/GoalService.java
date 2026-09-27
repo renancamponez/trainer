@@ -45,13 +45,15 @@ public class GoalService {
     private final DayLogRepository logRepo;
     private final ScoreService scoreService;
     private final ReadinessService readinessService;
+    private final DailySessionService dailySessionService;
 
-    public GoalService(PlanService planService, DayLogRepository logRepo,
-                       ScoreService scoreService, ReadinessService readinessService) {
+    public GoalService(PlanService planService, DayLogRepository logRepo, ScoreService scoreService,
+                       ReadinessService readinessService, DailySessionService dailySessionService) {
         this.planService = planService;
         this.logRepo = logRepo;
         this.scoreService = scoreService;
         this.readinessService = readinessService;
+        this.dailySessionService = dailySessionService;
     }
 
     public GoalProjection project(LocalDate asOf) {
@@ -70,14 +72,17 @@ public class GoalService {
         double plannedKm = 0, actualKm = 0;
         int plannedWorkouts = 0, doneWorkouts = 0;
         List<Double> scores = new ArrayList<>();
-        for (PlannedSession s : plan) {
-            if (s.date.compareTo(asOfStr) > 0 || s.date.compareTo(recentCutoff) < 0) continue;
+        // Readiness-adjusted sessions: a trimmed or swapped day done as adjusted is fully on plan.
+        Map<String, PlannedSession> adjusted = dailySessionService.effectiveRange(recentCutoff, asOfStr);
+        for (PlannedSession planned : plan) {
+            if (planned.date.compareTo(asOfStr) > 0 || planned.date.compareTo(recentCutoff) < 0) continue;
+            PlannedSession s = adjusted.getOrDefault(planned.date, planned);
             DayLog log = logs.get(s.date);
             boolean done = log != null && log.done && log.actualKm != null;
             if (s.date.equals(asOfStr) && !done) continue;       // today isn't a miss until it's over
             if (s.plannedKm != null) { plannedKm += s.plannedKm; if (done) actualKm += log.actualKm; }
             if ("Workout".equals(s.type)) { plannedWorkouts++; if (done) doneWorkouts++; }
-            if (done) { Double sc = scoreService.score(log).score(); if (sc != null) scores.add(sc); }
+            if (done) { Double sc = scoreService.score(log, s).score(); if (sc != null) scores.add(sc); }
         }
         double volAdh = plannedKm > 0 ? actualKm / plannedKm : 1.0;
         double workAdh = plannedWorkouts > 0 ? (double) doneWorkouts / plannedWorkouts : 1.0;

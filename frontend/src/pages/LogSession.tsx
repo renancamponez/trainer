@@ -6,6 +6,7 @@ import { fmtDate, paceFromKmMin } from "../lib/format";
 import { TypeBadge, VerdictBadge, SourceBadge } from "../components/Badges";
 import WorkoutSteps from "../components/WorkoutSteps";
 import PaceChart from "../components/PaceChart";
+import ReadinessBanner from "../components/ReadinessBanner";
 
 const empty = (date: string): DayLog => ({
   date, done: false, actualKm: null, actualMinutes: null, avgHr: null,
@@ -53,6 +54,8 @@ export default function LogSession() {
       {plan && plan.type !== "Off"
         ? <p className="page-sub">Week {plan.week} · {plan.session}</p>
         : <p className="page-sub">No scheduled training — log your readiness (and any run) below.</p>}
+
+      <ReadinessBanner s={plan} />
 
       {plan && plan.type !== "Rest" && plan.type !== "Off" && (
         <div className="card" style={{ marginBottom: 16 }}>

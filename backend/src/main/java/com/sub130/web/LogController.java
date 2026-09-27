@@ -49,6 +49,16 @@ public class LogController {
         } else {
             body.source = "manual";                                    // km/min/HR set or changed
         }
+        // Merge, don't replace: the page never sends the Strava stream data, and a readiness field
+        // it leaves empty may have been filled by the Garmin sync after the page was opened.
+        if (existing != null) {
+            if (body.reps == null) body.reps = existing.reps;
+            if (body.speedSeries == null) body.speedSeries = existing.speedSeries;
+            if (body.treadmill == null) body.treadmill = existing.treadmill;
+            if (body.hrvMs == null) body.hrvMs = existing.hrvMs;
+            if (body.restingHr == null) body.restingHr = existing.restingHr;
+            if (body.sleepScore == null) body.sleepScore = existing.sleepScore;
+        }
         return repo.save(body);
     }
 

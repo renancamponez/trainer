@@ -28,19 +28,24 @@ public class ScoreService {
             Pattern.compile("(\\d+)\\s*x\\s*\\d+(?:\\.\\d+)?\\s*(?:min|km|m)\\b\\s*@\\s*(\\d:\\d{2})/km");
     private static final Pattern HILL_C = Pattern.compile("(\\d+)\\s*x\\s*\\d+\\s*s\\s*hill sprints");
 
-    private final PlanService planService;
+    private final DailySessionService dailySessionService;
     private final SettingsService settingsService;
     private final HrZoneService hrZoneService;
 
-    public ScoreService(PlanService planService, SettingsService settingsService, HrZoneService hrZoneService) {
-        this.planService = planService;
+    public ScoreService(DailySessionService dailySessionService, SettingsService settingsService, HrZoneService hrZoneService) {
+        this.dailySessionService = dailySessionService;
         this.settingsService = settingsService;
         this.hrZoneService = hrZoneService;
     }
 
+    /** Score against the day's session as adjusted by that morning's readiness. */
     public ScoreResult score(DayLog log) {
+        return score(log, dailySessionService.effective(log.date));
+    }
+
+    /** Score against an already-resolved session (bulk callers avoid a readiness query per day). */
+    public ScoreResult score(DayLog log, PlannedSession p) {
         String date = log.date;
-        PlannedSession p = planService.forDate(date);
         if (p == null) return new ScoreResult(date, null, "-", "No planned session on this date.", List.of());
         if ("Rest".equals(p.type)) {
             if (log.done && log.actualKm != null && log.actualKm > 0)
