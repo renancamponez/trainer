@@ -26,8 +26,8 @@ public final class PlanConstants {
     // The Sept-27 race showed outdoor fitness is a little below that, so Phase 2 holds the same
     // paces rather than stepping up: the hill block trains at the fitness actually in hand. Phases
     // 3 and 4 step to VDOT ~43 and ~46 - what consistent training realistically delivers by spring.
-    // hmp is the 4:16 goal pace (sub-1:30); it is used in short doses as a reality check, not as a
-    // training pace. brace is the old Sept-27 race pace, only referenced by the week 9-10 history.
+    // hmp is the MAIN goal race pace: 4:44/km = 1:40 at Colorado. stretch is 4:16/km (sub-1:30),
+    // used only in the occasional stretch-pace check. brace is the old Sept-27 race pace, only referenced by the week 9-10 history.
     public static int[] easy(int phase) { return EASY[phase]; }
     private static final int[][] EASY = {
         null, {360, 396}, {360, 396}, {342, 378}, {326, 360}
@@ -36,7 +36,8 @@ public final class PlanConstants {
         "steady", new int[]{0, 328, 328, 309, 291},
         "thr",    new int[]{0, 306, 306, 288, 272},
         "vo2",    new int[]{0, 282, 282, 266, 250},
-        "hmp",    new int[]{0, 256, 256, 256, 256},
+        "hmp",    new int[]{0, 284, 284, 284, 284},     // 4:44 = 1:40 goal pace
+        "stretch",new int[]{0, 256, 256, 256, 256},     // 4:16 = sub-1:30 stretch pace
         "brace",  new int[]{0, 304, 304, 304, 304}
     );
 
@@ -109,7 +110,7 @@ public final class PlanConstants {
         Map.entry(30, "THRESHOLD: 3 x 12min @ {thr-3}/km, 2min jog"),
         // --- Race-specific (31-41): goal pace in short doses + downhill durability ---
         Map.entry(31, "THRESHOLD: 3 x 8min @ {thr}/km, 90s jog - down week"),
-        Map.entry(32, "GOAL PACE: 5 x 1km @ {hmp}/km, 2min jog - reality check: how does 4:16 feel?"),
+        Map.entry(32, "STRETCH CHECK: 5 x 1km @ {stretch}/km (sub-1:30 pace), 2min jog - how far off is it?"),
         Map.entry(33, "THRESHOLD: 2 x 20min @ {thr}/km, 3min jog"),
         Map.entry(34, "THRESHOLD: 4 x 5min @ {thr}/km, 90s jog - half marathon Sunday"),
         Map.entry(35, "RECOVERY WEEK: easy only - you raced on Sunday. Strides only if legs feel good"),
@@ -117,7 +118,7 @@ public final class PlanConstants {
         Map.entry(37, "THRESHOLD: 3 x 12min @ {thr-3}/km, 2min jog"),
         Map.entry(38, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog"),
         Map.entry(39, "THRESHOLD: 3 x 10min @ {thr}/km, 2min jog - taper begins"),
-        Map.entry(40, "GOAL PACE: 2 x 3km @ {hmp+5}/km, 3min jog - taper"),
+        Map.entry(40, "GOAL PACE: 2 x 3km @ {hmp}/km, 3min jog - taper"),
         Map.entry(41, "GOAL PACE: 2 x 2km @ {hmp}/km, 3min jog - feel the pace, race Sunday")
     );
 
@@ -155,11 +156,11 @@ public final class PlanConstants {
         Map.entry(30, "CRUISE: 3 x 3km @ {thr+5}/km, 2min jog"),
         Map.entry(31, "Easy + 6 x 100m strides - down week"),
         Map.entry(32, "DOWNHILL: 6 x 3min @ {thr}/km on a gentle 2-3% downhill road (outdoors), 3min jog back up"),
-        Map.entry(33, "GOAL PACE: 4 x 2km @ {hmp+10}/km, 2min jog"),
+        Map.entry(33, "GOAL PACE: 4 x 2km @ {hmp}/km, 2min jog"),
         Map.entry(34, "Easy + 4 x 100m strides - half marathon Sunday"),
         Map.entry(35, "RECOVERY WEEK: easy + 6 x 100m strides"),
         Map.entry(36, "DOWNHILL: 5 x 4min @ {thr-5}/km on a gentle downhill road (outdoors), 3min jog back up"),
-        Map.entry(37, "GOAL PACE: 2 x 5km @ {hmp+10}/km, 4min jog"),
+        Map.entry(37, "GOAL PACE: 2 x 5km @ {hmp}/km, 4min jog"),
         Map.entry(38, "VO2: 6 x 800m @ {vo2}/km, 2min jog"),
         Map.entry(39, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog - taper"),
         Map.entry(40, "VO2: 5 x 400m @ {vo2}/km, 200m jog - taper"),
@@ -177,10 +178,10 @@ public final class PlanConstants {
         Map.entry(28, "Long run - hilly route, final 5km @ {steady}/km"),
         Map.entry(30, "Long run - outdoors, rolling; 2 x 4km @ {steady-10}/km inside the run"),
         Map.entry(32, "Long run - OUTDOORS on a net-downhill route (Poudre or Boulder canyon), last 5km @ {steady}/km"),
-        Map.entry(33, "Long run - 3 x 3km @ {hmp+15}/km inside the run"),
-        Map.entry(36, "Long run - OUTDOORS on the Colorado Half course or a net-downhill canyon road, final 6km @ {hmp+15}/km"),
+        Map.entry(33, "Long run - 3 x 3km @ {hmp}/km inside the run"),
+        Map.entry(36, "Long run - OUTDOORS on the Colorado Half course or a net-downhill canyon road, final 6km @ {hmp}/km"),
         Map.entry(37, "Long run - rolling route, middle 8km @ {steady-10}/km"),
-        Map.entry(38, "Long run - net-downhill route, middle 8km @ {hmp+10}/km"),
+        Map.entry(38, "Long run - net-downhill route, middle 8km @ {hmp}/km"),
         Map.entry(39, "Long run - easy, net-downhill route; last 2km @ {hmp}/km")
     );
 
@@ -197,14 +198,15 @@ public final class PlanConstants {
             "Outdoors on a flat route this time - the honest calibration. 24:00 outdoors = VDOT ~40; faster "
           + "means the hill block is paying off. Re-tune paces from this result.")),
         Map.entry(26, new Checkpoint("Sat", "10K RACE", 10.0, "48:00", 48 * 60,
-            "Gate (VDOT ~42). Sub-47:00 keeps a May sub-1:30 alive on paper; 49:00+ means May becomes a "
-          + "~1:40 race and sub-1:30 moves to an autumn-2027 half.")),
+            "Gate (VDOT ~42). Sub-48:00 = on track for 1:40 in May. Sub-45:00 would put the sub-1:30 "
+          + "stretch in play; 50:00+ means re-aim May at ~1:45.")),
         Map.entry(34, new Checkpoint("Sun", "HALF MARATHON TUNE-UP", 21.1, "1:42:00", 102 * 60,
-            "Dress rehearsal (VDOT ~44), ideally flat or downhill. Practise fuelling and pacing. Sub-1:38 "
-          + "keeps 1:30 in play for Colorado; 1:42+ means race Colorado at ~4:50/km.")),
-        Map.entry(41, new Checkpoint("Sun", "COLORADO HALF MARATHON (GOAL)", 21.1, "sub 1:30:00", 5399,
+            "Dress rehearsal (VDOT ~44), ideally flat or downhill. Practise fuelling and pacing. 1:42 or better "
+          + "means 1:40 is on at Colorado (the downhill course is worth ~1.5 min); sub-1:35 puts the "
+          + "sub-1:30 stretch in play.")),
+        Map.entry(41, new Checkpoint("Sun", "COLORADO HALF MARATHON (GOAL)", 21.1, "1:40:00 (stretch sub-1:30)", 100 * 60,
             "Fort Collins, from Poudre Canyon: net ~100 m downhill, small rises near km 7 and 10, start "
-          + "~1,620 m. 4:16/km = 8.7 mph. Protect the quads on the canyon descent - don't bank time in "
+          + "~1,620 m. 4:44/km = 7.9 mph for 1:40; 4:16 if the stretch is on. Protect the quads on the canyon descent - don't bank time in "
           + "the first 8 km.", 1.015))
     );
 

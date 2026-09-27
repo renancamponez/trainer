@@ -212,8 +212,8 @@ export default function Dashboard() {
         </div>
         <div className="tile">
           <div className="label">Goal race</div>
-          <div className="value">Sub 1:30</div>
-          <div className="sub">Colorado Half · {goalWeek ? goalWeek.dates.split(" to ")[1] : "2027-05-02"}</div>
+          <div className="value">1:40</div>
+          <div className="sub">Colorado Half · {goalWeek ? goalWeek.dates.split(" to ")[1] : "2027-05-02"} · stretch sub-1:30</div>
         </div>
       </div>
 

@@ -16,33 +16,30 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * "Goal outlook" — a transparent heuristic (NOT a validated probability) for how likely
- * sub-1:30 is, given training done so far and time remaining.
+ * "Goal outlook" — how closely you are following the plan to the goal race time. 100% means you are
+ * doing everything the plan asks: the prescribed volume, every key session, well executed, and the
+ * latest checkpoint on target. It is a plan-adherence gauge, not a validated race-time probability.
  *
- *   likelihood = clamp( PRIOR·(1−conf) + conf·(PRIOR · exec · checkpoint · feasibility · risk) )
+ *   outlook = adherence · checkpoint · trajectory · risk
  *
- *   PRIOR         starting odds for this athlete on this plan (encouraging anchor: 0.55)
- *   exec          adherence + execution quality vs the prescription (recency-weighted)
- *   checkpoint    race results vs the plan's target times (ground truth once they happen)
- *   feasibility   can the remaining weeks still deliver the improvement still needed?
- *                 -> collapses toward 0 when the required rate stops being plausible
- *   risk          injury/overreaching discount from readiness (RED days, high ACWR)
- *   conf          grows with elapsed time so early noise doesn't swing it (responsive: min 0.35)
+ *   adherence   last 4 weeks: >=95% of prescribed km, all key sessions, sessions averaging >=8.5/10
+ *   checkpoint  the LATEST checkpoint vs its target (a new on-target result replaces an old miss)
+ *   trajectory  is current fitness on the line the checkpoint targets draw to the goal? If behind,
+ *               each s/week of extra improvement needed beyond the plan's line costs 5 points
+ *   risk        injury/overreaching discount from readiness (RED days, high ACWR)
  */
 @Service
 public class GoalService {
 
     private static final LocalDate PLAN_START = LocalDate.of(2026, 7, 17);
     private static final int PLAN_DAYS = (int) ChronoUnit.DAYS.between(PLAN_START, PlanConstants.GOAL_RACE);
-    // Fitness is tracked as a flat-course half equivalent. The goal is 1:30 on the Colorado course,
-    // which is net downhill, so the flat-equivalent bar is a little slower than 1:30.
-    private static final double GOAL_SEC = 5400;      // 1:30:00 on the goal course
+    // Fitness is tracked as a flat-course half equivalent. The goal is a time on the Colorado course,
+    // which is net downhill, so the flat-equivalent bar is a little slower than the goal itself.
+    private static final double GOAL_SEC = PlanConstants.CHECKPOINTS.get(PlanConstants.TOTAL_WEEKS).targetSec;   // 1:40:00
     private static final double GOAL_FLAT_SEC = GOAL_SEC
             * PlanConstants.CHECKPOINTS.get(PlanConstants.TOTAL_WEEKS).courseFactor;
     private static final double BASE_SEC = 6720;      // ~1:52 flat-equivalent at plan start (1:50:46 on the downhill Colorado course, May 2026)
-    private static final double PRIOR = 0.55;         // encouraging anchor
-    private static final double PLAN_RATE = (BASE_SEC - GOAL_FLAT_SEC) / (PLAN_DAYS / 7.0);   // s/week the plan demands
-    private static final double INFEASIBLE_RATE = 34.0;                     // s/week that's not plausible
+    private static final int TRAJECTORY_FROM_WEEK = 11;   // checkpoints set for the current (Colorado) plan
 
     private final PlanService planService;
     private final DayLogRepository logRepo;
@@ -59,7 +56,6 @@ public class GoalService {
 
     public GoalProjection project(LocalDate asOf) {
         long elapsedDays = clampL(ChronoUnit.DAYS.between(PLAN_START, asOf), 0, PLAN_DAYS);
-        double p = (double) elapsedDays / PLAN_DAYS;
         double remainingWeeks = Math.max((PLAN_DAYS - elapsedDays) / 7.0, 0.0);
         String asOfStr = asOf.toString();
 
@@ -67,45 +63,33 @@ public class GoalService {
         for (DayLog l : logRepo.findAllByOrderByDateAsc()) logs.put(l.date, l);
         List<PlannedSession> plan = planService.all();
 
-        // --- adherence (completed days only: strictly before today) ---
-        double plannedKmAll = 0, actualKmAll = 0, plannedKmRecent = 0, actualKmRecent = 0;
+        // --- adherence over the last 4 weeks (completed days only) ---
+        // Recent-only on purpose: the gauge answers "am I doing what the plan asks now?", so old
+        // gaps stop counting once four good weeks are in.
+        String recentCutoff = asOf.minusDays(28).toString();
+        double plannedKm = 0, actualKm = 0;
         int plannedWorkouts = 0, doneWorkouts = 0;
         List<Double> scores = new ArrayList<>();
-        String recentCutoff = asOf.minusDays(28).toString();
-
         for (PlannedSession s : plan) {
-            if (s.date.compareTo(asOfStr) > 0) continue;          // future doesn't count
+            if (s.date.compareTo(asOfStr) > 0 || s.date.compareTo(recentCutoff) < 0) continue;
             DayLog log = logs.get(s.date);
             boolean done = log != null && log.done && log.actualKm != null;
-            // Today counts only once it's actually done, so an unfinished day isn't a "miss".
-            if (s.date.equals(asOfStr) && !done) continue;
-            if (s.plannedKm != null) {
-                plannedKmAll += s.plannedKm;
-                if (done) actualKmAll += log.actualKm;
-                if (s.date.compareTo(recentCutoff) >= 0) {
-                    plannedKmRecent += s.plannedKm;
-                    if (done) actualKmRecent += log.actualKm;
-                }
-            }
+            if (s.date.equals(asOfStr) && !done) continue;       // today isn't a miss until it's over
+            if (s.plannedKm != null) { plannedKm += s.plannedKm; if (done) actualKm += log.actualKm; }
             if ("Workout".equals(s.type)) { plannedWorkouts++; if (done) doneWorkouts++; }
-            if (done) {
-                Double sc = scoreService.score(log).score();
-                if (sc != null) scores.add(sc);
-            }
+            if (done) { Double sc = scoreService.score(log).score(); if (sc != null) scores.add(sc); }
         }
-
-        double volCum = plannedKmAll > 0 ? actualKmAll / plannedKmAll : 1.0;
-        double volRecent = plannedKmRecent > 0 ? actualKmRecent / plannedKmRecent : volCum;
-        double volAdh = elapsedDays >= 28 ? 0.6 * volRecent + 0.4 * volCum : volCum;   // responsive: weight recent
+        double volAdh = plannedKm > 0 ? actualKm / plannedKm : 1.0;
         double workAdh = plannedWorkouts > 0 ? (double) doneWorkouts / plannedWorkouts : 1.0;
-        double execQ = scores.isEmpty() ? 0.85 : scores.stream().mapToDouble(x -> x).average().orElse(8.5) / 10.0;
+        double execAvg = scores.isEmpty() ? 8.5 : scores.stream().mapToDouble(x -> x).average().orElse(8.5);
+        double volScore = Math.min(1, volAdh / 0.95);
+        double workScore = Math.min(1, workAdh);
+        double execScore = Math.min(1, execAvg / 8.5);
+        double adherence = 0.45 * volScore + 0.35 * workScore + 0.20 * execScore;
 
-        double ti = 0.45 * Math.min(1, volAdh) + 0.35 * Math.min(1, workAdh) + 0.20 * execQ;
-        double execMult = clamp(ti / 0.90, 0.30, 1.15);
-
-        // --- checkpoints: race pace vs target pace (ground truth) ---
-        List<Double> ratios = new ArrayList<>();
-        Double lastCpEqHalf = null;
+        // --- checkpoints: the latest one reached ---
+        Double lastRatio = null, lastCpEqHalf = null;
+        LocalDate lastCpDate = null;
         String lastCpDetail = null;
         for (PlannedSession s : plan) {
             if (!s.checkpoint || s.date.compareTo(asOfStr) > 0) continue;   // include today if raced
@@ -124,29 +108,31 @@ public class GoalService {
                 if (pace < bestPace) { bestPace = pace; best = l; }
             }
             if (best == null) continue;
-            double measuredPace = bestPace;                                  // s/km of the best effort
             double targetPace = cp.targetSec / cp.distKm;
-            double ratio = targetPace / measuredPace;                        // >1 = faster than target (same course)
-            ratios.add(ratio);
+            lastRatio = targetPace / bestPace;                               // >1 = faster than target (same course)
             // Fitness uses the flat-course equivalent, so a hilly race isn't read as lost fitness.
-            lastCpEqHalf = riegelHalf(best.actualKm, measuredPace * best.actualKm * cp.courseFactor);
-            lastCpDetail = cp.label + ": " + fmt(measuredPace * best.actualKm) + " vs " + cp.targetLabel + " target ("
-                    + (ratio >= 1 ? "ahead" : "behind") + ")";
+            lastCpEqHalf = riegelHalf(best.actualKm, bestPace * best.actualKm * cp.courseFactor);
+            lastCpDate = LocalDate.parse(best.date);
+            lastCpDetail = cp.label + ": " + fmt(bestPace * best.actualKm) + " vs " + cp.targetLabel + " target ("
+                    + (lastRatio >= 1 ? "on/ahead" : "behind") + ")";
         }
-        double checkpointMult = ratios.isEmpty() ? 1.0
-                : clamp(1 + (avg(ratios) - 1) * 6, 0.5, 1.5);
+        // On or ahead of target = full marks; each 1% behind costs 5 points.
+        double cpScore = lastRatio == null ? 1.0 : clamp(1 - (1 - Math.min(1, lastRatio)) * 5, 0, 1);
 
-        // --- current fitness estimate (equivalent half time) ---
-        double effectiveness = clamp(ti, 0.15, 1.05);
-        double modelEqHalf = BASE_SEC - (BASE_SEC - GOAL_FLAT_SEC) * p * effectiveness;
-        double currentEqHalf = lastCpEqHalf != null ? 0.7 * lastCpEqHalf + 0.3 * modelEqHalf : modelEqHalf;
-        currentEqHalf = clamp(currentEqHalf, 5100, 7500);
+        // --- current fitness: last measured result, carried forward along the plan's line in
+        // proportion to how fully you've done the training since (no checkpoint yet: from baseline) ---
+        double expectedNow = expectedOnPlan(asOf);
+        double anchor = lastCpEqHalf != null ? lastCpEqHalf : BASE_SEC;
+        double anchorExpected = lastCpDate != null ? expectedOnPlan(lastCpDate) : BASE_SEC;
+        double currentEqHalf = clamp(anchor - Math.max(0, anchorExpected - expectedNow) * adherence, 5100, 7500);
 
-        // --- feasibility ceiling ---
+        // --- trajectory: on the checkpoint line, or can the gap still be closed? ---
         double gap = currentEqHalf - GOAL_FLAT_SEC;
         double requiredRate = gap <= 0 ? 0 : gap / Math.max(remainingWeeks, 0.3);
-        double feasibility = gap <= 0 ? 1.0
-                : clamp((INFEASIBLE_RATE - requiredRate) / (INFEASIBLE_RATE - PLAN_RATE), 0, 1);
+        double planRateNow = Math.max(0, expectedNow - GOAL_FLAT_SEC) / Math.max(remainingWeeks, 0.3);
+        // Each s/week of extra improvement needed beyond the plan's own line costs 5 points.
+        double trajectory = requiredRate <= planRateNow + 0.5 ? 1.0
+                : clamp(1 - (requiredRate - planRateNow) / 20.0, 0, 1);
 
         // --- injury-risk discount ---
         int red = 0, graded = 0;
@@ -160,32 +146,31 @@ public class GoalService {
         risk = clamp(risk, 0.70, 1.0);
 
         // --- combine ---
-        double raw = PRIOR * execMult * checkpointMult * feasibility * risk;
-        double conf = clamp(elapsedDays / 42.0, 0.35, 1.0);           // responsive
-        double likelihood = clamp(PRIOR * (1 - conf) + raw * conf, 0.02, 0.95);
-        int pct = (int) Math.round(likelihood * 100);
+        double outlook = clamp(adherence * cpScore * trajectory * risk, 0.02, 1.0);
+        int pct = (int) Math.round(outlook * 100);
 
         int elapsedWeeks = (int) Math.round(elapsedDays / 7.0);
         int remWeeks = (int) Math.round(remainingWeeks);
 
-        String band = pct >= 50 ? "ON_TRACK" : pct >= 32 ? "HARD_BUT_LIVE" : pct >= 15 ? "SLIPPING" : "OFF_TRACK";
+        String band = pct >= 80 ? "ON_TRACK" : pct >= 55 ? "HARD_BUT_LIVE" : pct >= 30 ? "SLIPPING" : "OFF_TRACK";
         String headline = elapsedWeeks < 2
                 ? "Barely started — this settles as you build a couple of weeks of history."
-                : headline(band, feasibility, volAdh, checkpointMult, ratios.isEmpty());
+                : headline(band, trajectory, volScore, cpScore, lastRatio == null);
 
         List<GoalProjection.Factor> factors = List.of(
-                new GoalProjection.Factor("Volume", (int) Math.round(Math.min(1.2, volAdh) * 100),
-                        String.format("%.0f of %.0f km prescribed so far", actualKmAll, plannedKmAll)),
-                new GoalProjection.Factor("Key workouts", (int) Math.round(workAdh * 100),
-                        doneWorkouts + " of " + plannedWorkouts + " quality sessions done"),
-                new GoalProjection.Factor("Execution", (int) Math.round(execQ * 100),
+                new GoalProjection.Factor("Volume", (int) Math.round(volScore * 100),
+                        String.format("%.0f of %.0f km prescribed (last 4 wks)", actualKm, plannedKm)),
+                new GoalProjection.Factor("Key workouts", (int) Math.round(workScore * 100),
+                        doneWorkouts + " of " + plannedWorkouts + " quality sessions (last 4 wks)"),
+                new GoalProjection.Factor("Execution", (int) Math.round(execScore * 100),
                         scores.isEmpty() ? "no scored sessions yet"
-                                : String.format("avg session score %.1f/10", execQ * 10)),
-                new GoalProjection.Factor("Checkpoints", ratios.isEmpty() ? 50 : (int) Math.round(clamp(avg(ratios), 0.7, 1.3) / 1.3 * 100),
+                                : String.format("avg session score %.1f/10 (full marks at 8.5)", execAvg)),
+                new GoalProjection.Factor("Checkpoints", (int) Math.round(cpScore * 100),
                         lastCpDetail != null ? lastCpDetail : "none reached yet"),
-                new GoalProjection.Factor("Time left", (int) Math.round(feasibility * 100),
+                new GoalProjection.Factor("Trajectory", (int) Math.round(trajectory * 100),
                         gap <= 0 ? "already at goal fitness"
-                                : String.format("need ~%.0f s/wk over %d wks (plan asks ~%.0f)", requiredRate, remWeeks, PLAN_RATE)),
+                                : trajectory >= 1 ? "on the plan's line to the goal"
+                                : String.format("need ~%.0f s/wk over %d wks (plan's line asks ~%.0f)", requiredRate, remWeeks, planRateNow)),
                 new GoalProjection.Factor("Injury risk", (int) Math.round(risk * 100),
                         graded == 0 ? "no readiness data yet"
                                 : red + " RED of " + graded + " logged days (last 4 wks)")
@@ -193,20 +178,46 @@ public class GoalService {
 
         // Shown as a predicted time on the goal course, so it compares directly with the goal.
         double onGoalCourse = currentEqHalf * GOAL_SEC / GOAL_FLAT_SEC;
-        return new GoalProjection(pct, band, headline, fmt(onGoalCourse), "1:29:59",
+        return new GoalProjection(pct, band, headline, fmt(onGoalCourse), fmt(GOAL_SEC),
                 elapsedWeeks, remWeeks, factors);
     }
 
-    private static String headline(String band, double feas, double vol, double cpMult, boolean noCp) {
-        if (feas < 0.30) return "Time is getting short for the pace you're at — this is the hard truth the model exists to show.";
-        if (vol < 0.80) return "Missed volume is the main drag. Consistency from here is what moves this most.";
-        if (!noCp && cpMult > 1.10) return "You're beating your checkpoint targets — the strongest signal there is.";
-        if (!noCp && cpMult < 0.92) return "Checkpoint result came in behind target — the 18-month path may be the smarter call.";
+    /**
+     * Where the plan expects your flat-equivalent half fitness to be on a date: straight lines from
+     * the plan-start baseline through each current-plan checkpoint target to the goal race.
+     */
+    private static double expectedOnPlan(LocalDate d) {
+        List<LocalDate> ds = new ArrayList<>(List.of(PLAN_START));
+        List<Double> vs = new ArrayList<>(List.of(BASE_SEC));
+        PlanConstants.CHECKPOINTS.entrySet().stream()
+                .filter(e -> e.getKey() >= TRAJECTORY_FROM_WEEK)
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(e -> {
+                    PlanConstants.Checkpoint cp = e.getValue();
+                    int dayOff = java.util.Arrays.asList(PlanConstants.DAY_NAMES).indexOf(cp.day);
+                    ds.add(PlanConstants.WEEK1_START.plusDays((e.getKey() - 1) * 7L + dayOff));
+                    vs.add(riegelHalf(cp.distKm, cp.targetSec * cp.courseFactor));
+                });
+        if (!d.isAfter(ds.get(0))) return vs.get(0);
+        for (int i = 1; i < ds.size(); i++) {
+            if (!d.isAfter(ds.get(i))) {
+                double span = ChronoUnit.DAYS.between(ds.get(i - 1), ds.get(i));
+                double f = span <= 0 ? 1 : ChronoUnit.DAYS.between(ds.get(i - 1), d) / span;
+                return vs.get(i - 1) + (vs.get(i) - vs.get(i - 1)) * f;
+            }
+        }
+        return vs.get(vs.size() - 1);
+    }
+
+    private static String headline(String band, double traj, double vol, double cp, boolean noCp) {
+        if ("ON_TRACK".equals(band)) return "Doing what the plan asks — keep this up and 1:40 in May is yours.";
+        if (!noCp && cp < 0.8) return "Latest checkpoint came in behind target — hit the next one and this recovers fast.";
+        if (vol < 0.85) return "Volume is the main gap — the prescribed kilometres are what move this most.";
+        if (traj < 0.5) return "Fitness is behind the plan's line — consistent weeks and the next checkpoint close it.";
         return switch (band) {
-            case "ON_TRACK" -> "Training is tracking the plan. Keep the easy days easy and hit the key sessions.";
-            case "HARD_BUT_LIVE" -> "Doable, but it's the hard path — exactly as billed from a ~1:52 start.";
-            case "SLIPPING" -> "Slipping off the pace. A strong block over the next few weeks can pull it back.";
-            default -> "The 12-month goal is off track. Extending to ~18 months is a success, not a failure.";
+            case "HARD_BUT_LIVE" -> "Close — tidy up the missed pieces and this climbs toward 100%.";
+            case "SLIPPING" -> "Slipping off the plan. A strong few weeks and the next checkpoint pull it back.";
+            default -> "Well off the plan right now — reset with four solid weeks.";
         };
     }
 
@@ -220,7 +231,6 @@ public class GoalService {
         return s / 3600 + ":" + pad(s % 3600 / 60) + ":" + pad(s % 60);
     }
     private static String pad(int n) { return n < 10 ? "0" + n : "" + n; }
-    private static double avg(List<Double> xs) { return xs.stream().mapToDouble(x -> x).average().orElse(1.0); }
     private static double clamp(double v, double lo, double hi) { return Math.max(lo, Math.min(hi, v)); }
     private static long clampL(long v, long lo, long hi) { return Math.max(lo, Math.min(hi, v)); }
 }

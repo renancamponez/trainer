@@ -21,7 +21,7 @@ public class Settings {
     public int lthr = 160;           // threshold HR - THE anchor. Field-test in week 2-3.
     public boolean lthrIsMeasured = false;
 
-    public String goal = "Sub 1:30:00 half (4:16/km / 8.7 mph)";
+    public String goal = "1:40 Colorado Half, May 2027 (4:44/km); stretch sub-1:30 (4:16/km)";
 
     public Settings() {}
 }
