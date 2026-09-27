@@ -24,7 +24,7 @@ export default function Calendar() {
   return (
     <>
       <h1 className="page-title">Calendar</h1>
-      <p className="page-sub">52 weeks + a 3-day intro. Click a week to see the sessions.</p>
+      <p className="page-sub">41 weeks + a 3-day intro, ending at the Colorado Half (2 May 2027). Click a week to see the sessions.</p>
       <div className="card" style={{ padding: 0 }}>
         <table>
           <thead>

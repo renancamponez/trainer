@@ -184,7 +184,7 @@ export default function Dashboard() {
 
   const done = weeks.reduce((a, w) => a + w.sessionsDone, 0);
   const planned = weeks.reduce((a, w) => a + w.sessionsPlanned, 0);
-  const goalWeek = weeks.find((w) => w.week === 52);
+  const goalWeek = weeks.length ? weeks[weeks.length - 1] : undefined;   // goal race = last plan week
   const rangeLabel = `${fmtDate(dates[0])} – ${fmtDate(dates[2])}`;
 
   return (
@@ -213,7 +213,7 @@ export default function Dashboard() {
         <div className="tile">
           <div className="label">Goal race</div>
           <div className="value">Sub 1:30</div>
-          <div className="sub">{goalWeek ? goalWeek.dates.split(" to ")[1] : "18 Jul 2027"}</div>
+          <div className="sub">Colorado Half · {goalWeek ? goalWeek.dates.split(" to ")[1] : "2027-05-02"}</div>
         </div>
       </div>
 

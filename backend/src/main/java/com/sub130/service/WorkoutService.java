@@ -25,6 +25,7 @@ public class WorkoutService {
     private static final Pattern STRIDES = Pattern.compile("(\\d+)\\s*x\\s*100m strides");
     private static final Pattern SINGLE = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*min\\s*@\\s*(\\d:\\d{2})/km");
     private static final Pattern RACEPACE = Pattern.compile("(\\d:\\d{2})/km");
+    private static final Pattern INCLINE = Pattern.compile("(\\d+)%\\s*incline");
 
     private final HrZoneService hr;
     private final SettingsService settings;
@@ -120,9 +121,12 @@ public class WorkoutService {
             intervalSet(raw, ivM, easyMph, lthr, p, steps);
         } else {
             String amt = singleM.group(1), pace = singleM.group(2);
-            steps.add(new Step("Main set", "Steady effort", intMin(amt) + " min", pace + "/km",
-                    one(mph(paceSec(pace))), "1%", zoneHr(paceSec(pace), p, lthr),
-                    "controlled and continuous — comfortably hard, not a race"));
+            boolean hillTempo = raw.toUpperCase().contains("HILL TEMPO");
+            steps.add(new Step("Main set", hillTempo ? "Hill tempo" : "Steady effort", intMin(amt) + " min", pace + "/km",
+                    one(mph(paceSec(pace))), hillTempo ? "alternate 4% / 1%" : "1%",
+                    hillTempo ? "Z3-4 · " + band("Z4", lthr) : zoneHr(paceSec(pace), p, lthr),
+                    hillTempo ? "hold the belt speed; let effort rise on the 4% blocks and settle on the 1% ones"
+                              : "controlled and continuous — comfortably hard, not a race"));
         }
 
         strides(raw, steps); // hill days carry strides in the main line
@@ -148,8 +152,13 @@ public class WorkoutService {
             double km = amt / 1000;
             amount = (int) amt + " m  (≈ " + dur(km * ps) + ")";
         }
+        boolean hill = label.startsWith("hill"), downhill = label.startsWith("downhill");
+        Matcher inc = INCLINE.matcher(raw);
+        String incline = downhill ? "-2 to -3% (outdoors)" : inc.find() ? inc.group(1) + "%" : "1%";
+        // On an incline the belt speed understates the effort, so the target is HR, not pace.
+        String hrTarget = (hill || downhill) ? "Z4 · " + band("Z4", lthr) : zoneHr(ps, p, lthr);
         steps.add(new Step("Main set", n + " × " + label, amount, pace + "/km",
-                one(mph(ps)), "1%", zoneHr(ps, p, lthr), repCue(label)));
+                one(mph(ps)), incline, hrTarget, repCue(label)));
 
         Matcher rec = RECOVERY.matcher(raw);
         if (rec.find() && n > 1) {
@@ -157,8 +166,9 @@ public class WorkoutService {
             String ramt = ru.equals("s") ? intMin(rv) + " s"
                     : ru.equals("min") ? intMin(rv) + " min"
                     : (int) Double.parseDouble(rv) + " m";
-            steps.add(new Step("Recovery", "(" + (n - 1) + " ×) between reps", ramt, "easy jog",
-                    easyMph + " or slower", "1%", "—", "keep moving, let HR drop before the next rep"));
+            steps.add(new Step("Recovery", "(" + (n - 1) + " ×) between reps", ramt,
+                    downhill ? "easy jog back up" : "easy jog",
+                    easyMph + " or slower", downhill ? "uphill" : "1%", "—", "keep moving, let HR drop before the next rep"));
         }
         return true;
     }
@@ -176,6 +186,8 @@ public class WorkoutService {
     // ---------- helpers ----------
     private String effortLabel(String raw, int paceSec, int phase) {
         String u = raw.toUpperCase();
+        if (u.contains("DOWNHILL")) return "downhill rep";
+        if (u.contains("HILL")) return "hill rep";
         if (u.contains("THRESHOLD")) return "threshold rep";
         if (u.contains("VO2")) return "VO2 rep (hard)";
         if (u.contains("FARTLEK")) return "surge";
@@ -193,6 +205,8 @@ public class WorkoutService {
     }
 
     private String repCue(String label) {
+        if (label.startsWith("hill")) return "effort, not speed: drive the arms, short quick steps, stay tall — keep cadence up";
+        if (label.startsWith("downhill")) return "quick light steps, slight forward lean, let gravity work — don't brake with the quads";
         if (label.startsWith("VO2")) return "hard but controlled — ~3K-5K effort, smooth form";
         if (label.startsWith("threshold")) return "\"comfortably hard\" — could hold ~1h in a race";
         if (label.startsWith("goal-pace")) return "lock into goal race rhythm — this is the target feel";

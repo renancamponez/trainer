@@ -33,11 +33,15 @@ import java.util.Map;
 public class GoalService {
 
     private static final LocalDate PLAN_START = LocalDate.of(2026, 7, 17);
-    private static final int PLAN_DAYS = 364;
-    private static final double GOAL_SEC = 5400;      // 1:30:00
-    private static final double BASE_SEC = 6480;      // 1:48:00 starting fitness
+    private static final int PLAN_DAYS = (int) ChronoUnit.DAYS.between(PLAN_START, PlanConstants.GOAL_RACE);
+    // Fitness is tracked as a flat-course half equivalent. The goal is 1:30 on the Colorado course,
+    // which is net downhill, so the flat-equivalent bar is a little slower than 1:30.
+    private static final double GOAL_SEC = 5400;      // 1:30:00 on the goal course
+    private static final double GOAL_FLAT_SEC = GOAL_SEC
+            * PlanConstants.CHECKPOINTS.get(PlanConstants.TOTAL_WEEKS).courseFactor;
+    private static final double BASE_SEC = 6720;      // ~1:52 flat-equivalent at plan start (1:50:46 on the downhill Colorado course, May 2026)
     private static final double PRIOR = 0.55;         // encouraging anchor
-    private static final double PLAN_RATE = (BASE_SEC - GOAL_SEC) / 52.0;   // ~20.8 s/week the plan demands
+    private static final double PLAN_RATE = (BASE_SEC - GOAL_FLAT_SEC) / (PLAN_DAYS / 7.0);   // s/week the plan demands
     private static final double INFEASIBLE_RATE = 34.0;                     // s/week that's not plausible
 
     private final PlanService planService;
@@ -122,9 +126,10 @@ public class GoalService {
             if (best == null) continue;
             double measuredPace = bestPace;                                  // s/km of the best effort
             double targetPace = cp.targetSec / cp.distKm;
-            double ratio = targetPace / measuredPace;                        // >1 = faster than target
+            double ratio = targetPace / measuredPace;                        // >1 = faster than target (same course)
             ratios.add(ratio);
-            lastCpEqHalf = riegelHalf(best.actualKm, measuredPace * best.actualKm);
+            // Fitness uses the flat-course equivalent, so a hilly race isn't read as lost fitness.
+            lastCpEqHalf = riegelHalf(best.actualKm, measuredPace * best.actualKm * cp.courseFactor);
             lastCpDetail = cp.label + ": " + fmt(measuredPace * best.actualKm) + " vs " + cp.targetLabel + " target ("
                     + (ratio >= 1 ? "ahead" : "behind") + ")";
         }
@@ -133,12 +138,12 @@ public class GoalService {
 
         // --- current fitness estimate (equivalent half time) ---
         double effectiveness = clamp(ti, 0.15, 1.05);
-        double modelEqHalf = BASE_SEC - (BASE_SEC - GOAL_SEC) * p * effectiveness;
+        double modelEqHalf = BASE_SEC - (BASE_SEC - GOAL_FLAT_SEC) * p * effectiveness;
         double currentEqHalf = lastCpEqHalf != null ? 0.7 * lastCpEqHalf + 0.3 * modelEqHalf : modelEqHalf;
-        currentEqHalf = clamp(currentEqHalf, 5100, 6600);
+        currentEqHalf = clamp(currentEqHalf, 5100, 7500);
 
         // --- feasibility ceiling ---
-        double gap = currentEqHalf - GOAL_SEC;
+        double gap = currentEqHalf - GOAL_FLAT_SEC;
         double requiredRate = gap <= 0 ? 0 : gap / Math.max(remainingWeeks, 0.3);
         double feasibility = gap <= 0 ? 1.0
                 : clamp((INFEASIBLE_RATE - requiredRate) / (INFEASIBLE_RATE - PLAN_RATE), 0, 1);
@@ -186,7 +191,9 @@ public class GoalService {
                                 : red + " RED of " + graded + " logged days (last 4 wks)")
         );
 
-        return new GoalProjection(pct, band, headline, fmt(currentEqHalf), "1:29:59",
+        // Shown as a predicted time on the goal course, so it compares directly with the goal.
+        double onGoalCourse = currentEqHalf * GOAL_SEC / GOAL_FLAT_SEC;
+        return new GoalProjection(pct, band, headline, fmt(onGoalCourse), "1:29:59",
                 elapsedWeeks, remWeeks, factors);
     }
 
@@ -197,7 +204,7 @@ public class GoalService {
         if (!noCp && cpMult < 0.92) return "Checkpoint result came in behind target — the 18-month path may be the smarter call.";
         return switch (band) {
             case "ON_TRACK" -> "Training is tracking the plan. Keep the easy days easy and hit the key sessions.";
-            case "HARD_BUT_LIVE" -> "Doable, but it's the hard path — exactly as billed from a 1:48 start.";
+            case "HARD_BUT_LIVE" -> "Doable, but it's the hard path — exactly as billed from a ~1:52 start.";
             case "SLIPPING" -> "Slipping off the pace. A strong block over the next few weeks can pull it back.";
             default -> "The 12-month goal is off track. Extending to ~18 months is a success, not a failure.";
         };

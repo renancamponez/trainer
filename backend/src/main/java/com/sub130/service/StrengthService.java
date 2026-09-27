@@ -42,6 +42,14 @@ public class StrengthService {
             "Push the hips back; bar stays close, tracking down the legs.",
             "Soft knees, flat back; stop when the hamstrings run out of stretch.",
             "Main builder for holding the pelvis neutral.")),
+        new Exercise("step-down", "Eccentric step-down", "3 x 8 / leg", false, true, List.of(
+            "Stand on a box on one leg; lower the other heel to the floor over a slow 3-count.",
+            "Knee tracks over the toes, hips level — control is the whole exercise.",
+            "Builds the quad strength that absorbs descents (Colorado is a canyon run downhill).")),
+        new Exercise("calf-raise", "Single-leg calf raise", "3 x 12 / leg", false, true, List.of(
+            "On a step edge, full range: heel below the step, then all the way up.",
+            "2 s up, 2 s down; hold a dumbbell once 12 feels easy.",
+            "Your push-off on climbs comes from here — the part that faded on the km 16-17 hill.")),
         new Exercise("dead-bug", "Dead bug", "3 x 8 / side", true, false, List.of(
             "Lower back pressed flat into the floor the whole set — that's the exercise.",
             "Extend opposite arm and leg slowly, exhaling as you reach.",
@@ -100,7 +108,7 @@ public class StrengthService {
     );
 
     private static final List<Milestone> CHECKLIST = List.of(
-        new Milestone("1-2", "All eight lifts with clean technique at light load; 30-min stand timer running; band lives on the desk."),
+        new Milestone("1-2", "All ten lifts with clean technique at light load; 30-min stand timer running; band lives on the desk."),
         new Milestone("3-4", "Noticeably less stiffness at the end of a work day; load up on rows and split squats."),
         new Milestone("5-8", "You catch yourself sitting upright without thinking; Y-T-W raises take a light weight."),
         new Milestone("9-16", "Visible change in how you stand; real strength gains on the RDL and suitcase carry.")

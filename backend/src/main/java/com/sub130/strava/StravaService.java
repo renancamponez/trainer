@@ -30,7 +30,7 @@ public class StravaService {
     private static final String ACTIVITIES = "https://www.strava.com/api/v3/athlete/activities";
     private static final Set<String> RUN_TYPES = Set.of("Run", "TrailRun", "VirtualRun");
     private static final LocalDate PLAN_START = LocalDate.of(2026, 7, 17);
-    private static final LocalDate PLAN_END = LocalDate.of(2027, 7, 18);
+    private static final LocalDate PLAN_END = com.sub130.plan.PlanConstants.GOAL_RACE;
 
     private final StravaProperties props;
     private final StravaTokenRepository tokenRepo;

@@ -36,7 +36,7 @@ public class AnalyticsController {
     @GetMapping("/summary")
     public List<DaySummary> summary(
             @RequestParam(defaultValue = "2026-07-17") String start,
-            @RequestParam(defaultValue = "2027-07-18") String end) {
+            @RequestParam(defaultValue = "2027-05-02") String end) {
         return analytics.summaries(start, end);
     }
 
@@ -52,7 +52,7 @@ public class AnalyticsController {
     @GetMapping("/readiness")
     public List<ReadinessResult> readinessRange(
             @RequestParam(defaultValue = "2026-07-17") String start,
-            @RequestParam(defaultValue = "2027-07-18") String end) {
+            @RequestParam(defaultValue = "2027-05-02") String end) {
         return readiness.computeRange(start, end);
     }
 }

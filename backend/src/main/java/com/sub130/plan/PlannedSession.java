@@ -6,7 +6,7 @@ package com.sub130.plan;
  * Public fields so Jackson serialises them directly.
  */
 public class PlannedSession {
-    public int week;          // 0..52 (0 = intro block)
+    public int week;          // 0..TOTAL_WEEKS (0 = intro block)
     public String date;       // ISO yyyy-MM-dd
     public String dayName;    // Mon..Sun
     public int phase;         // 1..4

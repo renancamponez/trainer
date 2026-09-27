@@ -61,6 +61,21 @@ const ICONS: Record<string, React.ReactNode> = {
     <path d="M40 32 L30 30" stroke={A} /><path d="M72 40 L74 60" opacity={0} />
     <line x1="20" y1="82" x2="100" y2="82" />
   </>),
+  "step-down": svg(<>
+    <rect x="50" y="52" width="34" height="30" rx="2" opacity={0.5} /> {/* box */}
+    <circle cx="66" cy="16" r="7" /><line x1="66" y1="23" x2="66" y2="42" />
+    <path d="M66 42 L70 52" /> {/* standing leg on box */}
+    <path d="M66 42 L50 58 L44 78" stroke={A} /> {/* lowering leg */}
+    <path d="M38 64 L44 74 L50 64" stroke={A} /> {/* slow-down arrow */}
+    <line x1="20" y1="82" x2="100" y2="82" />
+  </>),
+  "calf-raise": svg(<>
+    <rect x="40" y="70" width="40" height="12" rx="2" opacity={0.5} /> {/* step */}
+    <circle cx="60" cy="14" r="7" /><line x1="60" y1="21" x2="60" y2="52" />
+    <path d="M60 52 L60 64 L66 70" /> {/* up on toes */}
+    <path d="M60 52 L52 60" opacity={0.5} /> {/* other leg tucked */}
+    <path d="M78 58 L78 38" stroke={A} /><path d="M73 44 L78 38 L83 44" stroke={A} /> {/* rise */}
+  </>),
   "dead-bug": svg(<>
     <line x1="24" y1="66" x2="86" y2="66" strokeWidth={3} opacity={0.5} /> {/* floor / flat back */}
     <circle cx="30" cy="60" r="6" />

@@ -10,7 +10,7 @@ import static com.sub130.plan.PlanConstants.*;
 
 /**
  * Deterministic port of build_plan.py's build_week / build_week0. Produces the full
- * 367-day plan (3-day intro block + 52 weeks). No Spring dependency so it can be
+ * plan (3-day intro block + TOTAL_WEEKS weeks). No Spring dependency so it can be
  * compiled and diffed against the Python generator in isolation.
  */
 public final class PlanGenerator {
@@ -21,6 +21,7 @@ public final class PlanGenerator {
     // Structured work parsed to compute the true session distance/duration.
     private static final Pattern INTERVAL = Pattern.compile("(\\d+)\\s*x\\s*(\\d+(?:\\.\\d+)?)\\s*(min|km|m)\\b\\s*@\\s*(\\d:\\d{2})/km");
     private static final Pattern RECOVERY = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(s|min|m)\\s*jog");
+    private static final Pattern INCLINE = Pattern.compile("(\\d+)%\\s*incline");
     private static final Pattern SINGLE = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*min\\s*@\\s*(\\d:\\d{2})/km");
     private static final double MI_PER_KM = 1.609344;
 
@@ -175,6 +176,7 @@ public final class PlanGenerator {
         if (d.type.equals("RACE")) return d.raceDist <= 5 ? "Z5" : "Z4";
         if (d.type.equals("Easy") || d.type.equals("Long")) return "Z2";
         String up = d.raw.toUpperCase();
+        if (up.contains("HILL") || up.contains("DOWNHILL")) return "Z4";   // incline / downhill reps: effort, not pace
         if (up.contains("VO2") || up.contains("FARTLEK")) return "Z5";
         if (up.contains("STEADY")) return "Z3";
         if (up.contains("THRESHOLD") || up.contains("CRUISE")
@@ -201,7 +203,7 @@ public final class PlanGenerator {
         return (wu + cd) * em / 60 + main * blend / 60;
     }
 
-    /** Build one training week (1..52) as Mon..Sun. */
+    /** Build one training week (1..TOTAL_WEEKS) as Mon..Sun. */
     private static List<Day> buildWeek(int week) {
         int p = phaseOf(week);
         String easyStr = resolve("{easy}", p);
@@ -228,7 +230,7 @@ public final class PlanGenerator {
         long tue, thu, fri;
         if (cp == null) {
             Day sat = new Day("Sat", "Long");
-            sat.desc = resolve(SPECIAL_LONG.getOrDefault(week, "Long run - conversational the whole way"), p);
+            sat.desc = resolve(SPECIAL_LONG.getOrDefault(week, week >= 12 ? ROLLING_LONG : "Long run - conversational the whole way"), p);
             sat.km = longKm; sat.pace = easyStr;
             days.put("Sat", sat);
 
@@ -330,7 +332,11 @@ public final class PlanGenerator {
         s.type = d.type; s.session = desc; s.rawSession = d.raw; s.checkpoint = isCp;
         s.plannedKm = d.km == 0 ? null : d.km;
         s.paceRange = d.pace;
-        s.incline = d.type.equals("Rest") ? "-" : (hill ? "6-8%" : "1%");
+        Matcher inc = INCLINE.matcher(d.raw);
+        s.incline = d.type.equals("Rest") ? "-"
+                : hill ? "6-8%"
+                : d.raw.toUpperCase().contains("DOWNHILL") ? "outdoor downhill"
+                : inc.find() ? inc.group(1) + "% reps / 1% jog" : "1%";
 
         double em = easyMid(p);
         String eMph = mphOf(d.pace);
@@ -358,14 +364,14 @@ public final class PlanGenerator {
         return s;
     }
 
-    /** The complete plan: week 0 intro + weeks 1..52, one PlannedSession per real date. */
+    /** The complete plan: week 0 intro + weeks 1..TOTAL_WEEKS, one PlannedSession per real date. */
     public static List<PlannedSession> generateAll() {
         List<PlannedSession> all = new ArrayList<>();
         LocalDate[] w0dates = { WEEK0_START, WEEK0_START.plusDays(1), WEEK0_START.plusDays(2) };
         List<Day> w0 = buildWeek0();
         for (int i = 0; i < w0.size(); i++) all.add(finish(w0.get(i), 0, 1, w0dates[i], false));
 
-        for (int wk = 1; wk <= 52; wk++) {
+        for (int wk = 1; wk <= TOTAL_WEEKS; wk++) {
             int p = phaseOf(wk);
             boolean isCp = CHECKPOINTS.containsKey(wk);
             List<Day> days = buildWeek(wk);
