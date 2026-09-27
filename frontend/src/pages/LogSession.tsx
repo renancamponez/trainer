@@ -102,11 +102,11 @@ export default function LogSession() {
         <div className="card">
           <div className="spread" style={{ marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>Morning readiness</h3>
-            <span className="pill" style={{ background: "#5c6b7a33", color: "#93a1b0" }}>manual only</span>
+            <span className="pill" style={{ background: "#3b6ea533", color: "#7fb0e6" }}>Garmin · auto</span>
           </div>
           <div className="note" style={{ marginBottom: 12 }}>
-            Measured on waking. HRV, resting HR and sleep score together drive your readiness score —
-            never from Strava.
+            Synced from Garmin automatically each morning (overnight HRV, resting HR, sleep score).
+            Edit a value here if you need to — they drive your readiness score.
           </div>
           <div className="grid cols-3">
             <div className="field"><label>HRV (ms)</label>

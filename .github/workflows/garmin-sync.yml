@@ -1,0 +1,29 @@
+# Pulls overnight HRV, resting HR and sleep score from Garmin Connect into the app's
+# database every day. Needs two repo secrets: GARMIN_TOKENS (from scripts/garmin/setup.sh)
+# and MONGODB_URI (same value as on Render). Run it by hand from the Actions tab any time.
+name: garmin-sync
+
+on:
+  schedule:
+    # UTC. Fort Collins is UTC-6 in summer / UTC-7 in winter, so roughly 7-8 am, 10-11 am,
+    # 1-2 pm and 7-8 pm local - several passes in case the watch syncs late.
+    - cron: "0 14 * * *"
+    - cron: "30 16 * * *"
+    - cron: "30 19 * * *"
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q garth pymongo
+      - run: python scripts/garmin/garmin_sync.py
+        env:
+          GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
