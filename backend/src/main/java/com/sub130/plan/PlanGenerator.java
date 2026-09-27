@@ -176,7 +176,7 @@ public final class PlanGenerator {
         if (d.type.equals("RACE")) return d.raceDist <= 5 ? "Z5" : "Z4";
         if (d.type.equals("Easy") || d.type.equals("Long")) return "Z2";
         String up = d.raw.toUpperCase();
-        if (up.contains("HILL") || up.contains("DOWNHILL")) return "Z4";   // incline / downhill reps: effort, not pace
+        if (up.contains("HILL") || up.contains("TURNOVER")) return "Z4";   // incline / downhill reps: effort, not pace
         if (up.contains("VO2") || up.contains("FARTLEK")) return "Z5";
         if (up.contains("STEADY")) return "Z3";
         if (up.contains("THRESHOLD") || up.contains("CRUISE")
@@ -335,7 +335,6 @@ public final class PlanGenerator {
         Matcher inc = INCLINE.matcher(d.raw);
         s.incline = d.type.equals("Rest") ? "-"
                 : hill ? "6-8%"
-                : d.raw.toUpperCase().contains("DOWNHILL") ? "-2% (decline treadmill)"
                 : d.type.equals("Long") && d.raw.contains("incline") ? "varies - see session"
                 : inc.find() ? inc.group(1) + "% reps / 1% jog" : "1%";
 

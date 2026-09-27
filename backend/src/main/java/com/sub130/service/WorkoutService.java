@@ -62,7 +62,6 @@ public class WorkoutService {
                 (s.plannedKm == null ? "—" : trim(s.plannedKm) + " km"),
                 easyRange, easyMph,
                 raw.contains("rolling incline") ? "rolling 1% ↔ 3-4%"
-                        : raw.contains("decline") ? "-1 to -2% if available"
                         : raw.contains("incline") ? "see session" : "1%",
                 "Z2 · " + band("Z2", lthr),
                 isLong ? "conversational the whole way; start at the slow end" : "conversational — full sentences, no strain"));
@@ -156,11 +155,11 @@ public class WorkoutService {
             double km = amt / 1000;
             amount = (int) amt + " m  (≈ " + dur(km * ps) + ")";
         }
-        boolean hill = label.startsWith("hill"), downhill = label.startsWith("downhill");
+        boolean effortRep = label.startsWith("hill") || label.startsWith("descent");
         Matcher inc = INCLINE.matcher(raw);
-        String incline = downhill ? "-2% (decline treadmill)" : inc.find() ? inc.group(1) + "%" : "1%";
+        String incline = inc.find() ? inc.group(1) + "%" : "1%";
         // On an incline the belt speed understates the effort, so the target is HR, not pace.
-        String hrTarget = (hill || downhill) ? "Z4 · " + band("Z4", lthr) : zoneHr(ps, p, lthr);
+        String hrTarget = effortRep ? "Z4 · " + band("Z4", lthr) : zoneHr(ps, p, lthr);
         steps.add(new Step("Main set", n + " × " + label, amount, pace + "/km",
                 one(mph(ps)), incline, hrTarget, repCue(label)));
 
@@ -190,7 +189,7 @@ public class WorkoutService {
     // ---------- helpers ----------
     private String effortLabel(String raw, int paceSec, int phase) {
         String u = raw.toUpperCase();
-        if (u.contains("DOWNHILL")) return "downhill rep";
+        if (u.contains("TURNOVER")) return "descent-speed rep";
         if (u.contains("HILL")) return "hill rep";
         if (u.contains("THRESHOLD")) return "threshold rep";
         if (u.contains("VO2")) return "VO2 rep (hard)";
@@ -210,7 +209,7 @@ public class WorkoutService {
 
     private String repCue(String label) {
         if (label.startsWith("hill")) return "effort, not speed: drive the arms, short quick steps, stay tall — keep cadence up";
-        if (label.startsWith("downhill")) return "quick light steps, slight forward lean, let gravity work — don't brake with the quads";
+        if (label.startsWith("descent")) return "quick, light, quiet steps at 0% - the rhythm you'll run down Poudre Canyon; stay relaxed, not forced";
         if (label.startsWith("VO2")) return "hard but controlled — ~3K-5K effort, smooth form";
         if (label.startsWith("threshold")) return "\"comfortably hard\" — could hold ~1h in a race";
         if (label.startsWith("goal-pace")) return "lock into goal race rhythm — this is the target feel";

@@ -45,7 +45,8 @@ public class StrengthService {
         new Exercise("step-down", "Eccentric step-down", "3 x 8 / leg", false, true, List.of(
             "Stand on a box on one leg; lower the other heel to the floor over a slow 3-count.",
             "Knee tracks over the toes, hips level — control is the whole exercise.",
-            "Builds the quad strength that absorbs descents (Colorado is a canyon run downhill).")),
+            "This is your downhill training (no decline treadmill): from February hold dumbbells and "
+          + "make it a 4-count lower - it builds the quads that absorb Colorado's canyon descent.")),
         new Exercise("calf-raise", "Single-leg calf raise", "3 x 12 / leg", false, true, List.of(
             "On a step edge, full range: heel below the step, then all the way up.",
             "2 s up, 2 s down; hold a dumbbell once 12 feels easy.",

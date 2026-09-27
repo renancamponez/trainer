@@ -7,8 +7,9 @@ import java.util.Map;
  * were run; weeks 11-41 are the build to the goal race, the Colorado Half Marathon on Sun 2 May 2027
  * (Poudre Canyon to Fort Collins: net ~100 m downhill, ~60 m of climbing, start ~1,620 m).
  * The athlete lives in Fort Collins (~1,525 m, fully acclimatised) and trains mainly on a treadmill,
- * so hills are incline work, "rolling" long runs vary the incline, and downhills use a decline
- * treadmill where available (eccentric step-downs in the gym cover the rest).
+ * so hills are incline work and "rolling" long runs vary the incline. There is no decline treadmill,
+ * so the canyon descent is prepared two ways: eccentric strength (loaded step-downs in the gym) and
+ * "turnover" reps at 0% at the quicker speed a descent gives at race effort.
  */
 public final class PlanConstants {
     private PlanConstants() {}
@@ -158,11 +159,11 @@ public final class PlanConstants {
         Map.entry(29, "VO2: 6 x 1000m @ {vo2}/km, 2min jog"),
         Map.entry(30, "CRUISE: 3 x 3km @ {thr+5}/km, 2min jog"),
         Map.entry(31, "Easy + 6 x 100m strides - down week"),
-        Map.entry(32, "DOWNHILL: 6 x 3min @ {thr}/km at -2% on a decline treadmill (no decline? run them at 1% - the gym step-downs carry the quad work), 3min jog"),
+        Map.entry(32, "TURNOVER: 6 x 3min @ {thr-5}/km at 0% incline, 2min jog - the speed the canyon descent gives you; quick, light steps"),
         Map.entry(33, "GOAL PACE: 4 x 2km @ {hmp}/km, 2min jog"),
         Map.entry(34, "Easy + 4 x 100m strides - half marathon Sunday"),
         Map.entry(35, "RECOVERY WEEK: easy + 6 x 100m strides"),
-        Map.entry(36, "DOWNHILL: 5 x 4min @ {thr-5}/km at -2% on a decline treadmill (no decline? run them at 1%), 3min jog"),
+        Map.entry(36, "TURNOVER: 5 x 4min @ {thr-8}/km at 0% incline, 2min jog - descent-speed turnover, relaxed shoulders"),
         Map.entry(37, "GOAL PACE: 2 x 5km @ {hmp}/km, 4min jog"),
         Map.entry(38, "VO2: 6 x 800m @ {vo2}/km, 2min jog"),
         Map.entry(39, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog - taper"),
@@ -180,11 +181,11 @@ public final class PlanConstants {
         Map.entry(25, "Long run - rolling incline 1-3%; middle 6km @ {steady}/km"),
         Map.entry(28, "Long run - rolling incline 1-4%; final 5km @ {steady}/km"),
         Map.entry(30, "Long run - rolling incline 1-3%; 2 x 4km @ {steady-10}/km inside the run"),
-        Map.entry(32, "Long run - decline treadmill (-1 to -2%) for the first half if you have one, else 1%; last 5km @ {steady}/km"),
+        Map.entry(32, "Long run - first half at 0% incline (a touch quicker, like the canyon start), final 5km @ {steady}/km at 1%"),
         Map.entry(33, "Long run - 3 x 3km @ {hmp}/km inside the run"),
         Map.entry(36, "Long run - final 6km @ {hmp}/km. Optional: run this one in Poudre Canyon to preview the Colorado course; otherwise treadmill at 1%"),
-        Map.entry(37, "Long run - rolling route, middle 8km @ {steady-10}/km"),
-        Map.entry(38, "Long run - middle 8km @ {hmp}/km (at -1% on a decline treadmill if available)"),
+        Map.entry(37, "Long run - rolling incline 1-3%; middle 8km @ {steady-10}/km"),
+        Map.entry(38, "Long run - middle 8km @ {hmp}/km at 0% incline"),
         Map.entry(39, "Long run - easy; last 2km @ {hmp}/km")
     );
 
