@@ -6,6 +6,9 @@ import java.util.Map;
  * The plan's data. Weeks 1-10 are history (the build to the Sept-27 Boulderthon) and stay as they
  * were run; weeks 11-41 are the build to the goal race, the Colorado Half Marathon on Sun 2 May 2027
  * (Poudre Canyon to Fort Collins: net ~100 m downhill, ~60 m of climbing, start ~1,620 m).
+ * The athlete lives in Fort Collins (~1,525 m, fully acclimatised) and trains mainly on a treadmill,
+ * so hills are incline work, "rolling" long runs vary the incline, and downhills use a decline
+ * treadmill where available (eccentric step-downs in the gym cover the rest).
  */
 public final class PlanConstants {
     private PlanConstants() {}
@@ -116,9 +119,9 @@ public final class PlanConstants {
         Map.entry(35, "RECOVERY WEEK: easy only - you raced on Sunday. Strides only if legs feel good"),
         Map.entry(36, "GOAL PACE: 4 x 2km @ {hmp}/km, 2min jog"),
         Map.entry(37, "THRESHOLD: 3 x 12min @ {thr-3}/km, 2min jog"),
-        Map.entry(38, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog"),
+        Map.entry(38, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog - cover the speed display on the last rep and run it by feel"),
         Map.entry(39, "THRESHOLD: 3 x 10min @ {thr}/km, 2min jog - taper begins"),
-        Map.entry(40, "GOAL PACE: 2 x 3km @ {hmp}/km, 3min jog - taper"),
+        Map.entry(40, "GOAL PACE: 2 x 3km @ {hmp}/km, 3min jog - taper; second rep by feel, display covered"),
         Map.entry(41, "GOAL PACE: 2 x 2km @ {hmp}/km, 3min jog - feel the pace, race Sunday")
     );
 
@@ -155,11 +158,11 @@ public final class PlanConstants {
         Map.entry(29, "VO2: 6 x 1000m @ {vo2}/km, 2min jog"),
         Map.entry(30, "CRUISE: 3 x 3km @ {thr+5}/km, 2min jog"),
         Map.entry(31, "Easy + 6 x 100m strides - down week"),
-        Map.entry(32, "DOWNHILL: 6 x 3min @ {thr}/km on a gentle 2-3% downhill road (outdoors), 3min jog back up"),
+        Map.entry(32, "DOWNHILL: 6 x 3min @ {thr}/km at -2% on a decline treadmill (no decline? run them at 1% - the gym step-downs carry the quad work), 3min jog"),
         Map.entry(33, "GOAL PACE: 4 x 2km @ {hmp}/km, 2min jog"),
         Map.entry(34, "Easy + 4 x 100m strides - half marathon Sunday"),
         Map.entry(35, "RECOVERY WEEK: easy + 6 x 100m strides"),
-        Map.entry(36, "DOWNHILL: 5 x 4min @ {thr-5}/km on a gentle downhill road (outdoors), 3min jog back up"),
+        Map.entry(36, "DOWNHILL: 5 x 4min @ {thr-5}/km at -2% on a decline treadmill (no decline? run them at 1%), 3min jog"),
         Map.entry(37, "GOAL PACE: 2 x 5km @ {hmp}/km, 4min jog"),
         Map.entry(38, "VO2: 6 x 800m @ {vo2}/km, 2min jog"),
         Map.entry(39, "GOAL PACE: 3 x 2km @ {hmp}/km, 2min jog - taper"),
@@ -167,48 +170,55 @@ public final class PlanConstants {
         Map.entry(41, "Easy + 4 x 100m strides - race Sunday, leg-loosener only")
     );
 
-    /** Default long-run text from the hill block on: outdoors, where the climbs actually are. */
-    public static final String ROLLING_LONG = "Long run - outdoors on a rolling route; conversational, run every climb by effort, not pace";
+    /** Default long-run text from the hill block on: a "rolling" run on the treadmill. */
+    public static final String ROLLING_LONG = "Long run - rolling incline: switch between 1% and 3-4% every 5 min; conversational, climbs by effort not pace";
 
     public static final Map<Integer, String> SPECIAL_LONG = Map.ofEntries(
-        Map.entry(17, "Long run - outdoors, hilly route; practise climbing on tired legs in the last 4km"),
-        Map.entry(20, "Long run - outdoors, hilly route; keep cadence up on every climb (short, quick steps)"),
-        Map.entry(22, "Long run - hilly route, last 4km @ {steady}/km including the climbs"),
-        Map.entry(25, "Long run - outdoors, rolling; middle 6km @ {steady}/km"),
-        Map.entry(28, "Long run - hilly route, final 5km @ {steady}/km"),
-        Map.entry(30, "Long run - outdoors, rolling; 2 x 4km @ {steady-10}/km inside the run"),
-        Map.entry(32, "Long run - OUTDOORS on a net-downhill route (Poudre or Boulder canyon), last 5km @ {steady}/km"),
+        Map.entry(17, "Long run - last 4km at 3-4% incline: practise climbing on tired legs"),
+        Map.entry(20, "Long run - every 10 min a 3min block at 4% incline; keep cadence up (short, quick steps)"),
+        Map.entry(22, "Long run - last 4km @ {steady}/km at 2% incline"),
+        Map.entry(25, "Long run - rolling incline 1-3%; middle 6km @ {steady}/km"),
+        Map.entry(28, "Long run - rolling incline 1-4%; final 5km @ {steady}/km"),
+        Map.entry(30, "Long run - rolling incline 1-3%; 2 x 4km @ {steady-10}/km inside the run"),
+        Map.entry(32, "Long run - decline treadmill (-1 to -2%) for the first half if you have one, else 1%; last 5km @ {steady}/km"),
         Map.entry(33, "Long run - 3 x 3km @ {hmp}/km inside the run"),
-        Map.entry(36, "Long run - OUTDOORS on the Colorado Half course or a net-downhill canyon road, final 6km @ {hmp}/km"),
+        Map.entry(36, "Long run - final 6km @ {hmp}/km. Optional: run this one in Poudre Canyon to preview the Colorado course; otherwise treadmill at 1%"),
         Map.entry(37, "Long run - rolling route, middle 8km @ {steady-10}/km"),
-        Map.entry(38, "Long run - net-downhill route, middle 8km @ {hmp}/km"),
-        Map.entry(39, "Long run - easy, net-downhill route; last 2km @ {hmp}/km")
+        Map.entry(38, "Long run - middle 8km @ {hmp}/km (at -1% on a decline treadmill if available)"),
+        Map.entry(39, "Long run - easy; last 2km @ {hmp}/km")
     );
 
     /** week -> checkpoint race. */
     public static final Map<Integer, Checkpoint> CHECKPOINTS = Map.ofEntries(
         Map.entry(6, new Checkpoint("Sat", "5K TIME TRIAL", 5.0, "24:00", 24 * 60,
-            "Done: 24:00 (4:48/km) - on the treadmill. Treadmill times run optimistic outdoors, which the "
-          + "Sept-27 race confirmed; the next time trial is outdoors.")),
+            "Done: 24:00 (4:48/km) on the treadmill. Treadmill times run ~2% fast versus racing, which the "
+          + "Sept-27 race confirmed; the app now corrects treadmill efforts for it.")),
         Map.entry(10, new Checkpoint("Sun", "SEPT 27 BOULDERTHON HALF (B-race)", 21.1, "1:47:00", 107 * 60,
             "Result 1:57:44 on a hilly course (+160 m) at 26 C. Went out at 5:06-5:14 with HR at 160+ from km 3, "
           + "slowed at the same HR from km 7, and cadence collapsed on the km 16-17 and 21 climbs. "
           + "Target was set off a treadmill 5K - too aggressive for outdoor fitness.", 0.975)),
-        Map.entry(18, new Checkpoint("Sat", "5K TIME TRIAL (OUTDOORS)", 5.0, "24:00", 24 * 60,
-            "Outdoors on a flat route this time - the honest calibration. 24:00 outdoors = VDOT ~40; faster "
-          + "means the hill block is paying off. Re-tune paces from this result.")),
+        Map.entry(18, new Checkpoint("Sat", "5K TIME TRIAL", 5.0, "24:00", 24 * 60,
+            "Treadmill at 1%, same machine as every TT so results compare like-for-like. Target is 24:00 "
+          + "race-equivalent = ~23:32 on the belt (the app applies the ~2% treadmill correction). Faster "
+          + "means the hill block is paying off; re-tune paces from this result.")),
         Map.entry(26, new Checkpoint("Sat", "10K RACE", 10.0, "48:00", 48 * 60,
-            "Gate (VDOT ~42). Sub-48:00 = on track for 1:40 in May. Sub-45:00 would put the sub-1:30 "
+            "Gate (VDOT ~42). A road 10K or a 1% treadmill TT both count (treadmill is corrected ~2%). "
+          + "Sub-48:00 = on track for 1:40 in May. Sub-45:00 would put the sub-1:30 "
           + "stretch in play; 50:00+ means re-aim May at ~1:45.")),
         Map.entry(34, new Checkpoint("Sun", "HALF MARATHON TUNE-UP", 21.1, "1:42:00", 102 * 60,
-            "Dress rehearsal (VDOT ~44), ideally flat or downhill. Practise fuelling and pacing. 1:42 or better "
+            "Dress rehearsal (VDOT ~44): a flat/downhill road half, or 21.1 km on the treadmill at 1% (corrected ~2%). Practise fuelling and pacing. 1:42 or better "
           + "means 1:40 is on at Colorado (the downhill course is worth ~1.5 min); sub-1:35 puts the "
           + "sub-1:30 stretch in play.")),
         Map.entry(41, new Checkpoint("Sun", "COLORADO HALF MARATHON (GOAL)", 21.1, "1:40:00 (stretch sub-1:30)", 100 * 60,
             "Fort Collins, from Poudre Canyon: net ~100 m downhill, small rises near km 7 and 10, start "
-          + "~1,620 m. 4:44/km = 7.9 mph for 1:40; 4:16 if the stretch is on. Protect the quads on the canyon descent - don't bank time in "
-          + "the first 8 km.", 1.015))
+          + "~1,620 m. 4:44/km = 7.9 mph for 1:40; 4:16 if the stretch is on. First race off the belt: check your "
+          + "watch every km for the first 3 km - the canyon descent makes 4:44 feel easy, so don't bank time "
+          + "in the first 8 km.", 1.015))
     );
+
+    /** Treadmill time -> race-equivalent multiplier (belt runs ~2% fast vs racing on the road).
+     *  Applied automatically to any checkpoint effort Strava flags as a treadmill run. */
+    public static final double TREADMILL = 1.02;
 
     /** Weeks whose Monday follows a Sunday race get an extra rest day. */
     public static boolean postRaceMondayRest(int week) {

@@ -29,6 +29,9 @@ public class DayLog {
     /** Where the objective actuals (km/time/HR) came from: "manual" or "strava". */
     public String source;
 
+    /** True when the day's main run was on a treadmill (Strava "trainer"); null if unknown. */
+    public Boolean treadmill;
+
     /**
      * Hard efforts detected from the Strava velocity stream (intervals / strides / hill reps),
      * fastest-segment analysis. Null when never synced from a stream; empty when a stream was

@@ -108,12 +108,16 @@ public class GoalService {
                 if (pace < bestPace) { bestPace = pace; best = l; }
             }
             if (best == null) continue;
+            // A treadmill effort is converted to its race equivalent (the belt runs ~2% fast).
+            double tm = Boolean.TRUE.equals(best.treadmill) ? PlanConstants.TREADMILL : 1.0;
             double targetPace = cp.targetSec / cp.distKm;
-            lastRatio = targetPace / bestPace;                               // >1 = faster than target (same course)
+            lastRatio = targetPace / (bestPace * tm);                        // >1 = faster than target (same course)
             // Fitness uses the flat-course equivalent, so a hilly race isn't read as lost fitness.
-            lastCpEqHalf = riegelHalf(best.actualKm, bestPace * best.actualKm * cp.courseFactor);
+            lastCpEqHalf = riegelHalf(best.actualKm, bestPace * best.actualKm * tm * cp.courseFactor);
             lastCpDate = LocalDate.parse(best.date);
-            lastCpDetail = cp.label + ": " + fmt(bestPace * best.actualKm) + " vs " + cp.targetLabel + " target ("
+            lastCpDetail = cp.label + ": " + fmt(bestPace * best.actualKm)
+                    + (tm > 1 ? " treadmill (≈" + fmt(bestPace * best.actualKm * tm) + " race-equiv)" : "")
+                    + " vs " + cp.targetLabel + " target ("
                     + (lastRatio >= 1 ? "on/ahead" : "behind") + ")";
         }
         // On or ahead of target = full marks; each 1% behind costs 5 points.

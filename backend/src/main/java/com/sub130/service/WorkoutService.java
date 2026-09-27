@@ -60,7 +60,11 @@ public class WorkoutService {
         boolean isLong = "Long".equals(s.type);
         steps.add(new Step("Run", isLong ? "Long run" : "Easy run",
                 (s.plannedKm == null ? "—" : trim(s.plannedKm) + " km"),
-                easyRange, easyMph, "1%", "Z2 · " + band("Z2", lthr),
+                easyRange, easyMph,
+                raw.contains("rolling incline") ? "rolling 1% ↔ 3-4%"
+                        : raw.contains("decline") ? "-1 to -2% if available"
+                        : raw.contains("incline") ? "see session" : "1%",
+                "Z2 · " + band("Z2", lthr),
                 isLong ? "conversational the whole way; start at the slow end" : "conversational — full sentences, no strain"));
         // embedded quality inside a long run (e.g. "final 5km @ 4:55/km")
         Matcher q = RACEPACE.matcher(raw);
@@ -154,7 +158,7 @@ public class WorkoutService {
         }
         boolean hill = label.startsWith("hill"), downhill = label.startsWith("downhill");
         Matcher inc = INCLINE.matcher(raw);
-        String incline = downhill ? "-2 to -3% (outdoors)" : inc.find() ? inc.group(1) + "%" : "1%";
+        String incline = downhill ? "-2% (decline treadmill)" : inc.find() ? inc.group(1) + "%" : "1%";
         // On an incline the belt speed understates the effort, so the target is HR, not pace.
         String hrTarget = (hill || downhill) ? "Z4 · " + band("Z4", lthr) : zoneHr(ps, p, lthr);
         steps.add(new Step("Main set", n + " × " + label, amount, pace + "/km",
@@ -167,8 +171,8 @@ public class WorkoutService {
                     : ru.equals("min") ? intMin(rv) + " min"
                     : (int) Double.parseDouble(rv) + " m";
             steps.add(new Step("Recovery", "(" + (n - 1) + " ×) between reps", ramt,
-                    downhill ? "easy jog back up" : "easy jog",
-                    easyMph + " or slower", downhill ? "uphill" : "1%", "—", "keep moving, let HR drop before the next rep"));
+                    "easy jog",
+                    easyMph + " or slower", "1%", "—", "keep moving, let HR drop before the next rep"));
         }
         return true;
     }

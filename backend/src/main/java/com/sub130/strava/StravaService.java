@@ -207,6 +207,8 @@ public class StravaService {
         Map<String, List<DayLog.Rep>> repsByDate = new HashMap<>(); // reps from the day's primary (longest) run
         Map<String, List<Double>> speedByDate = new HashMap<>();
         Map<String, Double> primaryMovingS = new HashMap<>();
+        Map<String, Boolean> treadmillByDate = new HashMap<>();   // trainer flag of the day's longest run
+        Map<String, Double> longestMovingS = new HashMap<>();
         for (JsonNode a : activities) {
             String type = a.hasNonNull("sport_type") ? a.get("sport_type").asText() : a.path("type").asText("");
             if (!RUN_TYPES.contains(type)) continue;
@@ -221,6 +223,11 @@ public class StravaService {
             double movingS = a.path("moving_time").asDouble(0);
             v[0] += distM;
             v[1] += movingS;
+
+            if (movingS > longestMovingS.getOrDefault(key, 0.0)) {
+                longestMovingS.put(key, movingS);
+                treadmillByDate.put(key, a.path("trainer").asBoolean(false));
+            }
 
             // One stream fetch per activity yields both the trimmed HR and the detected reps.
             StreamResult sr = (token != null && a.hasNonNull("id") && movingS >= 300)
@@ -251,6 +258,7 @@ public class StravaService {
             if (hr != null) log.avgHr = hr;
             if (repsByDate.containsKey(e.getKey())) log.reps = repsByDate.get(e.getKey());
             if (speedByDate.containsKey(e.getKey())) log.speedSeries = speedByDate.get(e.getKey());
+            if (treadmillByDate.containsKey(e.getKey())) log.treadmill = treadmillByDate.get(e.getKey());
             logRepo.save(log);
             out.add(new ImportedDay(e.getKey(), log.actualKm, log.actualMinutes, log.avgHr));
         }

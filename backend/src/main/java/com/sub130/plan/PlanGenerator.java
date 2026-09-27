@@ -335,7 +335,8 @@ public final class PlanGenerator {
         Matcher inc = INCLINE.matcher(d.raw);
         s.incline = d.type.equals("Rest") ? "-"
                 : hill ? "6-8%"
-                : d.raw.toUpperCase().contains("DOWNHILL") ? "outdoor downhill"
+                : d.raw.toUpperCase().contains("DOWNHILL") ? "-2% (decline treadmill)"
+                : d.type.equals("Long") && d.raw.contains("incline") ? "varies - see session"
                 : inc.find() ? inc.group(1) + "% reps / 1% jog" : "1%";
 
         double em = easyMid(p);
