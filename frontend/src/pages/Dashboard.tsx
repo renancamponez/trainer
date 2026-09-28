@@ -139,6 +139,7 @@ export default function Dashboard() {
   const [err, setErr] = useState<string | null>(null);
   // Morning readiness from Garmin: "waiting" while a sync runs, "late" if Garmin has nothing yet.
   const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "done">("idle");
+  const [garminAuto, setGarminAuto] = useState(true);   // false = app can't start the sync itself (no GITHUB_TOKEN)
 
   const dates = useMemo(() => [shiftDate(anchor, -1), anchor, shiftDate(anchor, 1)], [anchor]);
 
@@ -164,7 +165,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!today || today.hrvMs != null || today.sleepScore != null || garmin !== "idle") return;
     setGarmin("waiting");
-    api.garminSync().catch(() => {});
+    api.garminSync().then((r) => setGarminAuto(r.status !== "not-configured" && r.status !== "error")).catch(() => setGarminAuto(false));
     const started = Date.now();
     let timer: ReturnType<typeof setTimeout>;
     const poll = () => {
@@ -243,8 +244,12 @@ export default function Dashboard() {
       )}
       {garmin === "late" && (
         <div className="note" style={{ marginBottom: 12 }}>
-          Garmin doesn't have last night's data yet. Open Garmin Connect on your phone to sync your watch —
-          this page keeps checking and updates today's session when it arrives.
+          {garminAuto
+            ? <>Garmin doesn't have last night's data yet. Open Garmin Connect on your phone to sync your watch —
+                this page keeps checking and updates today's session when it arrives.</>
+            : <>Today's readiness hasn't synced yet. Sync your watch in Garmin Connect, then{" "}
+                <a href="https://github.com/renancamponez/trainer/actions/workflows/garmin-sync.yml" target="_blank"
+                   rel="noreferrer">run the Garmin sync</a> ("Run workflow") — this page picks it up about a minute later.</>}
         </div>
       )}
       {goal && <div style={{ marginBottom: 16 }}><GoalGauge goal={goal} /></div>}
