@@ -100,11 +100,20 @@ function DayCard({
         )}
       </div>
 
-      {gym && gym.label !== "Off" && (
-        <div className="note" style={{ marginTop: 8, color: gym.gymType === "none" ? "#93a1b0" : "#7fb0e6" }}>
-          {gym.gymType === "none" ? "🧍" : "🏋"} {gym.label}
-        </div>
-      )}
+      {gym && gym.label !== "Off" && (() => {
+        // The weekday schedule gives way to rest days and to readiness-adjusted days.
+        const rest = summary?.type === "Rest";
+        const eased = summary?.adjustment === "EASY" || summary?.adjustment === "REST";
+        const noGym = rest || eased;
+        const label = rest ? "Rest day - desk routine only"
+                    : eased ? "Upper body / desk routine only (readiness)" : gym.label;
+        const light = noGym || gym.gymType === "none";
+        return (
+          <div className="note" style={{ marginTop: 8, color: light ? "#93a1b0" : "#7fb0e6" }}>
+            {light ? "🧍" : "🏋"} {label}
+          </div>
+        );
+      })()}
 
       <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: "wrap" }}>
         <Link to={`/log/${date}`}><button className="ghost">{summary?.done || loggedReadiness ? "Edit" : "Log"}</button></Link>
@@ -180,10 +189,11 @@ export default function Dashboard() {
         const age = Date.now() - started;
         if (age > 30 * 60_000) { setGarmin("late"); return; }
         if (age > 4 * 60_000) setGarmin("late");
-        timer = setTimeout(poll, age > 4 * 60_000 ? 60_000 : 15_000);
-      }).catch(() => { timer = setTimeout(poll, 30_000); });
+        // A sync takes ~30 s: check every 5 s for 2 min, then 15 s, then every minute.
+        timer = setTimeout(poll, age < 2 * 60_000 ? 5_000 : age < 4 * 60_000 ? 15_000 : 60_000);
+      }).catch(() => { timer = setTimeout(poll, 15_000); });
     };
-    timer = setTimeout(poll, 15_000);
+    timer = setTimeout(poll, 5_000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today]);
@@ -238,12 +248,15 @@ export default function Dashboard() {
       </p>
 
       {garmin === "waiting" && (
-        <div className="note" style={{ marginBottom: 12 }}>
-          Pulling last night's HRV, resting HR and sleep from Garmin… today's session will update on its own.
+        <div style={{ background: "#3b6ea522", borderLeft: "3px solid #4a9eff", borderRadius: 6,
+                      padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
+          <span className="pulse-dot" />
+          Syncing last night's HRV, resting HR and sleep from Garmin — about 30 seconds. Today's session updates on its own.
         </div>
       )}
       {garmin === "late" && (
-        <div className="note" style={{ marginBottom: 12 }}>
+        <div style={{ background: "#e0a10022", borderLeft: "3px solid #f0b73a", borderRadius: 6,
+                      padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
           {garminAuto
             ? <>Garmin doesn't have last night's data yet. Open Garmin Connect on your phone to sync your watch —
                 this page keeps checking and updates today's session when it arrives.</>
@@ -257,11 +270,25 @@ export default function Dashboard() {
       <div className="grid cols-3" style={{ marginBottom: 20 }}>
         <div className="tile">
           <div className="label">Readiness (today)</div>
-          <div className="value" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
-            {today?.readinessScore != null && <span>{today.readinessScore}</span>}
-            <VerdictBadge verdict={today?.verdict ?? null} />
-          </div>
-          <div className="sub">{today?.readinessAction ?? "—"}</div>
+          {garmin === "waiting" || garmin === "late" ? (
+            <>
+              <div className="value" style={{ fontSize: 17, display: "flex", alignItems: "center" }}>
+                <span className="pulse-dot" />{garmin === "waiting" ? "Syncing from Garmin…" : "Waiting for Garmin"}
+              </div>
+              <div className="sub">
+                {garmin === "waiting" ? "Last night's HRV, resting HR and sleep"
+                                      : "Sync your watch in Garmin Connect — checking every minute"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="value" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                {today?.readinessScore != null && <span>{today.readinessScore}</span>}
+                <VerdictBadge verdict={today?.verdict ?? null} />
+              </div>
+              <div className="sub">{today?.readinessAction ?? "—"}</div>
+            </>
+          )}
         </div>
         <div className="tile">
           <div className="label">Plan progress</div>

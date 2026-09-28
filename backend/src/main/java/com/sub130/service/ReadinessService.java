@@ -100,7 +100,7 @@ public class ReadinessService {
         String verdict, action;
         if (score == null) {
             verdict = "NEEDS_DATA";
-            action = "Log HRV, resting HR and sleep score to unlock readiness.";
+            action = "Waiting for this morning's Garmin sync (HRV, resting HR, sleep).";
         } else {
             List<String> drivers = new java.util.ArrayList<>();
             if (sHrv != null && sHrv < 0.6) drivers.add("HRV " + hrvPct + "% of usual");

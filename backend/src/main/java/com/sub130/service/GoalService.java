@@ -158,7 +158,8 @@ public class GoalService {
         double outlook = clamp(adherence * cpScore * trajectory * risk, 0.02, 1.0);
         int pct = (int) Math.round(outlook * 100);
 
-        int elapsedWeeks = (int) Math.round(elapsedDays / 7.0);
+        // Plan week number (week 1 starts Mon 20 Jul), so it matches the rest of the app.
+        int elapsedWeeks = (int) Math.max(0, ChronoUnit.DAYS.between(PlanConstants.WEEK1_START, asOf) / 7 + 1);
         int remWeeks = (int) Math.round(remainingWeeks);
 
         String band = pct >= 80 ? "ON_TRACK" : pct >= 55 ? "HARD_BUT_LIVE" : pct >= 30 ? "SLIPPING" : "OFF_TRACK";
