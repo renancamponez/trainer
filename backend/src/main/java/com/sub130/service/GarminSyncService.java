@@ -1,6 +1,8 @@
 package com.sub130.service;
 
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -9,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -25,12 +28,27 @@ public class GarminSyncService {
     private final String token;
     private final String repo;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final MongoTemplate mongo;
     private volatile Instant lastDispatch = Instant.EPOCH;
 
     public GarminSyncService(@Value("${GITHUB_TOKEN:}") String token,
-                             @Value("${GITHUB_REPO:renancamponez/trainer}") String repo) {
+                             @Value("${GITHUB_REPO:renancamponez/trainer}") String repo,
+                             MongoTemplate mongo) {
         this.token = token == null ? "" : token.trim();
         this.repo = repo;
+        this.mongo = mongo;
+    }
+
+    /** Whether the app can start syncs, and how the last sync run went (written by garmin_sync.py). */
+    public Map<String, Object> status() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("configured", configured());
+        Document last = mongo.findById("last", Document.class, "garmin_sync_status");
+        if (last != null) {
+            last.remove("_id");
+            m.put("lastRun", last);
+        }
+        return m;
     }
 
     public boolean configured() { return !token.isEmpty(); }

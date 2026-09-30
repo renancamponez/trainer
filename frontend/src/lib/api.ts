@@ -28,6 +28,7 @@ export const api = {
   profile: (date: string) => req<PaceProfile>(`/plan/profile/${date}`),
   strength: () => req<StrengthProgram>(`/strength`),
   garminSync: () => req<{ status: string }>(`/garmin/sync`, { method: "POST" }),
+  garminStatus: () => req<{ configured: boolean; lastRun?: { ok: boolean; message: string; at: string } }>(`/garmin/status`),
   strengthDay: (date: string) => req<StrengthDaySlot>(`/strength/day/${date}`),
 
   getLog: (date: string) => req<DayLog | null>(`/logs/${date}`).catch(() => null),

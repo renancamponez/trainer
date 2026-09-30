@@ -147,7 +147,8 @@ export default function Dashboard() {
   const [syncMsg, setSyncMsg] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
   // Morning readiness from Garmin: "waiting" while a sync runs, "late" if Garmin has nothing yet.
-  const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "done">("idle");
+  const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "failed" | "done">("idle");
+  const [garminError, setGarminError] = useState<string>("");
   const [garminAuto, setGarminAuto] = useState(true);   // false = app can't start the sync itself (no GITHUB_TOKEN)
 
   const dates = useMemo(() => [shiftDate(anchor, -1), anchor, shiftDate(anchor, 1)], [anchor]);
@@ -178,6 +179,13 @@ export default function Dashboard() {
     const started = Date.now();
     let timer: ReturnType<typeof setTimeout>;
     const poll = () => {
+      // A run that finished with an error after we started waiting means waiting won't help.
+      api.garminStatus().then((st) => {
+        const r = st.lastRun;
+        if (r && !r.ok && Date.parse(r.at) > started - 60_000) {
+          setGarminError(r.message); setGarmin("failed"); clearTimeout(timer);
+        }
+      }).catch(() => {});
       api.daySummary(TODAY).then((s) => {
         if (s && (s.hrvMs != null || s.sleepScore != null)) {
           setToday(s);
@@ -187,8 +195,8 @@ export default function Dashboard() {
           return;
         }
         const age = Date.now() - started;
-        if (age > 30 * 60_000) { setGarmin("late"); return; }
-        if (age > 4 * 60_000) setGarmin("late");
+        if (age > 30 * 60_000) { setGarmin((g) => g === "failed" ? g : "late"); return; }
+        if (age > 4 * 60_000) setGarmin((g) => g === "failed" ? g : "late");
         // A sync takes ~30 s: check every 5 s for 2 min, then 15 s, then every minute.
         timer = setTimeout(poll, age < 2 * 60_000 ? 5_000 : age < 4 * 60_000 ? 15_000 : 60_000);
       }).catch(() => { timer = setTimeout(poll, 15_000); });
@@ -254,6 +262,18 @@ export default function Dashboard() {
           Syncing last night's HRV, resting HR and sleep from Garmin — about 30 seconds. Today's session updates on its own.
         </div>
       )}
+      {garmin === "failed" && (
+        <div style={{ background: "#e5484d22", borderLeft: "3px solid #f2777b", borderRadius: 6,
+                      padding: "10px 12px", marginBottom: 14, fontSize: 13.5, lineHeight: 1.45 }}>
+          <b style={{ color: "#f2777b" }}>The Garmin sync is failing.</b>{" "}
+          {/sign-in|401|403|Unauthorized|session/i.test(garminError)
+            ? <>Garmin's sign-in needs renewing. On your Mac, run{" "}
+                <code>bash ~/Documents/running/sub130-app/scripts/garmin/setup.sh</code> (one minute, nothing to paste),
+                then reload this page.</>
+            : <>Garmin returned an error; today's session is shown as planned.</>}
+          <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{garminError}</div>
+        </div>
+      )}
       {garmin === "late" && (
         <div style={{ background: "#e0a10022", borderLeft: "3px solid #f0b73a", borderRadius: 6,
                       padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
@@ -270,14 +290,16 @@ export default function Dashboard() {
       <div className="grid cols-3" style={{ marginBottom: 20 }}>
         <div className="tile">
           <div className="label">Readiness (today)</div>
-          {garmin === "waiting" || garmin === "late" ? (
+          {garmin === "waiting" || garmin === "late" || garmin === "failed" ? (
             <>
               <div className="value" style={{ fontSize: 17, display: "flex", alignItems: "center" }}>
-                <span className="pulse-dot" />{garmin === "waiting" ? "Syncing from Garmin…" : "Waiting for Garmin"}
+                {garmin !== "failed" && <span className="pulse-dot" />}
+                {garmin === "waiting" ? "Syncing from Garmin…" : garmin === "failed" ? "Garmin sync failed" : "Waiting for Garmin"}
               </div>
               <div className="sub">
                 {garmin === "waiting" ? "Last night's HRV, resting HR and sleep"
-                                      : "Sync your watch in Garmin Connect — checking every minute"}
+                  : garmin === "failed" ? "See the message above - training shown as planned"
+                  : "Sync your watch in Garmin Connect — checking every minute"}
               </div>
             </>
           ) : (

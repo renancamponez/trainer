@@ -14,7 +14,7 @@ public class GarminController {
     public GarminController(GarminSyncService garmin) { this.garmin = garmin; }
 
     @GetMapping("/status")
-    public Map<String, Object> status() { return Map.of("configured", garmin.configured()); }
+    public Map<String, Object> status() { return garmin.status(); }
 
     /** Start a Garmin readiness sync now (the app calls this when today's readiness is missing). */
     @PostMapping("/sync")
