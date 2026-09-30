@@ -128,7 +128,9 @@ def sync(dry_run=False):
         sys.exit(1)
     try:
         garth.client.loads(tokens)
-        user = garth.client.username            # first API call: refreshes the short-lived token if needed
+        # First API call (refreshes the short-lived token if needed). Garmin's per-user endpoints want
+        # the profile's displayName; the login userName (here an email) gets 403 on the daily summary.
+        user = garth.client.profile.get("displayName") or garth.client.username
     except Exception as e:
         o2 = getattr(garth.client, "oauth2_token", None)
         exp = getattr(o2, "expires_at", None)
