@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import type { DaySummary, ScoreResult, WeekSummary, GoalProjection, StrengthDaySlot } from "../lib/types";
@@ -171,38 +171,44 @@ export default function Dashboard() {
   }, []);
 
   // If this morning's HRV / sleep haven't arrived, start a Garmin sync and watch for them, so the
-  // day's session re-adjusts on its own (fast polling for 4 min, then every minute for 30).
+  // day's session re-adjusts on its own. The watch loop lives in refs: other refreshes of `today`
+  // (e.g. the Strava auto-sync finishing) must not cancel it - that left the page stuck on "Syncing".
+  const garminStarted = useRef(false);
+  const garminTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(garminTimer.current), []);   // stop only when leaving the page
   useEffect(() => {
-    if (!today || today.hrvMs != null || today.sleepScore != null || garmin !== "idle") return;
+    if (!today || garminStarted.current || today.hrvMs != null || today.sleepScore != null) return;
+    garminStarted.current = true;
     setGarmin("waiting");
-    api.garminSync().then((r) => setGarminAuto(r.status !== "not-configured" && r.status !== "error")).catch(() => setGarminAuto(false));
+    api.garminSync().then((r) => setGarminAuto(r.status !== "not-configured" && r.status !== "error"))
+      .catch(() => setGarminAuto(false));
     const started = Date.now();
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = () => {
-      // A run that finished with an error after we started waiting means waiting won't help.
-      api.garminStatus().then((st) => {
-        const r = st.lastRun;
-        if (r && !r.ok && Date.parse(r.at) > started - 60_000) {
-          setGarminError(r.message); setGarmin("failed"); clearTimeout(timer);
-        }
-      }).catch(() => {});
-      api.daySummary(TODAY).then((s) => {
-        if (s && (s.hrvMs != null || s.sleepScore != null)) {
-          setToday(s);
-          setSummaries((p) => ({ ...p, [TODAY]: s }));
-          api.goal(TODAY).then(setGoal).catch(() => {});
-          setGarmin("done");
-          return;
-        }
-        const age = Date.now() - started;
-        if (age > 30 * 60_000) { setGarmin((g) => g === "failed" ? g : "late"); return; }
-        if (age > 4 * 60_000) setGarmin((g) => g === "failed" ? g : "late");
-        // A sync takes ~30 s: check every 5 s for 2 min, then 15 s, then every minute.
-        timer = setTimeout(poll, age < 2 * 60_000 ? 5_000 : age < 4 * 60_000 ? 15_000 : 60_000);
-      }).catch(() => { timer = setTimeout(poll, 15_000); });
+    const arrived = (s: DaySummary | null) => {
+      if (!s || (s.hrvMs == null && s.sleepScore == null)) return false;
+      setToday(s);
+      setSummaries((p) => ({ ...p, [TODAY]: s }));
+      api.goal(TODAY).then(setGoal).catch(() => {});
+      setGarmin("done");
+      return true;
     };
-    timer = setTimeout(poll, 5_000);
-    return () => clearTimeout(timer);
+    const poll = async () => {
+      try {
+        const [s, st] = await Promise.all([api.daySummary(TODAY), api.garminStatus().catch(() => null)]);
+        if (arrived(s)) return;
+        const r = st?.lastRun;
+        if (r && !r.ok && Date.parse(r.at) > started - 60_000) {
+          setGarminError(r.message); setGarmin("failed"); return;
+        }
+        // A run that finished after we opened, yet today isn't there: Garmin has no data for last night yet.
+        if (r && r.ok && Date.parse(r.at) > started) setGarmin((g) => (g === "waiting" ? "late" : g));
+      } catch { /* network blip - keep going */ }
+      const age = Date.now() - started;
+      if (age > 30 * 60_000) { setGarmin((g) => (g === "waiting" ? "late" : g)); return; }
+      if (age > 4 * 60_000) setGarmin((g) => (g === "waiting" ? "late" : g));
+      // A sync takes ~30 s: check every 5 s for 2 min, then 15 s, then every minute.
+      garminTimer.current = setTimeout(poll, age < 2 * 60_000 ? 5_000 : age < 4 * 60_000 ? 15_000 : 60_000);
+    };
+    garminTimer.current = setTimeout(poll, 5_000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today]);
 
