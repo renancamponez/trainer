@@ -147,9 +147,8 @@ export default function Dashboard() {
   const [syncMsg, setSyncMsg] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
   // Morning readiness from Garmin: "waiting" while a sync runs, "late" if Garmin has nothing yet.
-  const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "failed" | "done">("idle");
+  const [garmin, setGarmin] = useState<"idle" | "waiting" | "late" | "failed" | "setup" | "done">("idle");
   const [garminError, setGarminError] = useState<string>("");
-  const [garminAuto, setGarminAuto] = useState(true);   // false = app can't start the sync itself (no GITHUB_TOKEN)
 
   const dates = useMemo(() => [shiftDate(anchor, -1), anchor, shiftDate(anchor, 1)], [anchor]);
 
@@ -170,9 +169,9 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If this morning's HRV / sleep haven't arrived, start a Garmin sync and watch for them, so the
-  // day's session re-adjusts on its own. The watch loop lives in refs: other refreshes of `today`
-  // (e.g. the Strava auto-sync finishing) must not cancel it - that left the page stuck on "Syncing".
+  // If this morning's HRV / sleep haven't arrived, pull them (Garmin -> intervals.icu -> here, ~1 s).
+  // If Garmin hasn't sent last night yet (watch not synced), check again every minute for 30 min.
+  // The loop lives in refs so other refreshes of `today` (e.g. the Strava auto-sync) can't cancel it.
   const garminStarted = useRef(false);
   const garminTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(garminTimer.current), []);   // stop only when leaving the page
@@ -180,35 +179,30 @@ export default function Dashboard() {
     if (!today || garminStarted.current || today.hrvMs != null || today.sleepScore != null) return;
     garminStarted.current = true;
     setGarmin("waiting");
-    api.garminSync().then((r) => setGarminAuto(r.status !== "not-configured" && r.status !== "error"))
-      .catch(() => setGarminAuto(false));
     const started = Date.now();
-    const arrived = (s: DaySummary | null) => {
-      if (!s || (s.hrvMs == null && s.sleepScore == null)) return false;
-      setToday(s);
-      setSummaries((p) => ({ ...p, [TODAY]: s }));
-      api.goal(TODAY).then(setGoal).catch(() => {});
-      setGarmin("done");
-      return true;
-    };
-    const poll = async () => {
+    let failures = 0;
+    const attempt = async () => {
       try {
-        const [s, st] = await Promise.all([api.daySummary(TODAY), api.garminStatus().catch(() => null)]);
-        if (arrived(s)) return;
-        const r = st?.lastRun;
-        if (r && !r.ok && Date.parse(r.at) > started - 60_000) {
-          setGarminError(r.message); setGarmin("failed"); return;
+        const r = await api.wellnessSync(TODAY);
+        failures = 0;
+        if (r.todayHasData) {
+          const s = await api.daySummary(TODAY);
+          setToday(s);
+          setSummaries((p) => ({ ...p, [TODAY]: s }));
+          api.goal(TODAY).then(setGoal).catch(() => {});
+          setGarmin("done");
+          return;
         }
-        // A run that finished after we opened, yet today isn't there: Garmin has no data for last night yet.
-        if (r && r.ok && Date.parse(r.at) > started) setGarmin((g) => (g === "waiting" ? "late" : g));
-      } catch { /* network blip - keep going */ }
-      const age = Date.now() - started;
-      if (age > 30 * 60_000) { setGarmin((g) => (g === "waiting" ? "late" : g)); return; }
-      if (age > 4 * 60_000) setGarmin((g) => (g === "waiting" ? "late" : g));
-      // A sync takes ~30 s: check every 5 s for 2 min, then 15 s, then every minute.
-      garminTimer.current = setTimeout(poll, age < 2 * 60_000 ? 5_000 : age < 4 * 60_000 ? 15_000 : 60_000);
+        if (r.status === "not-configured") { setGarmin("setup"); return; }
+        if (r.status === "error") { setGarminError(r.message ?? "unknown error"); setGarmin("failed"); return; }
+        setGarmin("late");   // synced fine, but Garmin has nothing for last night yet
+      } catch (e) {
+        // One blip is fine; two in a row means something is actually wrong - say so instead of spinning.
+        if (++failures >= 2) { setGarminError(`Couldn't reach the app server: ${String(e)}`); setGarmin("failed"); }
+      }
+      if (Date.now() - started < 30 * 60_000) garminTimer.current = setTimeout(attempt, 60_000);
     };
-    garminTimer.current = setTimeout(poll, 5_000);
+    attempt();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today]);
 
@@ -265,30 +259,31 @@ export default function Dashboard() {
         <div style={{ background: "#3b6ea522", borderLeft: "3px solid #4a9eff", borderRadius: 6,
                       padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
           <span className="pulse-dot" />
-          Syncing last night's HRV, resting HR and sleep from Garmin — about 30 seconds. Today's session updates on its own.
+          Syncing last night's HRV, resting HR and sleep from Garmin… today's session updates on its own.
         </div>
       )}
       {garmin === "failed" && (
         <div style={{ background: "#e5484d22", borderLeft: "3px solid #f2777b", borderRadius: 6,
                       padding: "10px 12px", marginBottom: 14, fontSize: 13.5, lineHeight: 1.45 }}>
           <b style={{ color: "#f2777b" }}>The Garmin sync is failing.</b>{" "}
-          {/sign-in|401|403|Unauthorized|session/i.test(garminError)
-            ? <>Garmin's sign-in needs renewing. On your Mac, run{" "}
-                <code>bash ~/Documents/running/sub130-app/scripts/garmin/setup.sh</code> (one minute, nothing to paste),
-                then reload this page.</>
-            : <>Garmin returned an error; today's session is shown as planned.</>}
+          {/rejected|API key|athlete/i.test(garminError)
+            ? <>Check the intervals.icu athlete ID and API key on the <Link to="/settings">Settings</Link> page.</>
+            : <>Today's session is shown as planned; this page will try again on your next visit.</>}
           <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{garminError}</div>
         </div>
       )}
       {garmin === "late" && (
         <div style={{ background: "#e0a10022", borderLeft: "3px solid #f0b73a", borderRadius: 6,
                       padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
-          {garminAuto
-            ? <>Garmin doesn't have last night's data yet. Open Garmin Connect on your phone to sync your watch —
-                this page keeps checking and updates today's session when it arrives.</>
-            : <>Today's readiness hasn't synced yet. Sync your watch in Garmin Connect, then{" "}
-                <a href="https://github.com/renancamponez/trainer/actions/workflows/garmin-sync.yml" target="_blank"
-                   rel="noreferrer">run the Garmin sync</a> ("Run workflow") — this page picks it up about a minute later.</>}
+          Garmin hasn't sent last night's data yet. Open Garmin Connect on your phone to sync your watch —
+          this page checks every minute and updates today's session when it arrives.
+        </div>
+      )}
+      {garmin === "setup" && (
+        <div style={{ background: "#3b6ea522", borderLeft: "3px solid #4a9eff", borderRadius: 6,
+                      padding: "10px 12px", marginBottom: 14, fontSize: 13.5 }}>
+          Connect your Garmin readiness (HRV, resting HR, sleep) once on the{" "}
+          <Link to="/settings">Settings</Link> page — about 5 minutes via intervals.icu, then it's automatic.
         </div>
       )}
       {goal && <div style={{ marginBottom: 16 }}><GoalGauge goal={goal} /></div>}
@@ -296,15 +291,17 @@ export default function Dashboard() {
       <div className="grid cols-3" style={{ marginBottom: 20 }}>
         <div className="tile">
           <div className="label">Readiness (today)</div>
-          {garmin === "waiting" || garmin === "late" || garmin === "failed" ? (
+          {garmin === "waiting" || garmin === "late" || garmin === "failed" || garmin === "setup" ? (
             <>
               <div className="value" style={{ fontSize: 17, display: "flex", alignItems: "center" }}>
-                {garmin !== "failed" && <span className="pulse-dot" />}
-                {garmin === "waiting" ? "Syncing from Garmin…" : garmin === "failed" ? "Garmin sync failed" : "Waiting for Garmin"}
+                {(garmin === "waiting" || garmin === "late") && <span className="pulse-dot" />}
+                {garmin === "waiting" ? "Syncing from Garmin…" : garmin === "failed" ? "Garmin sync failed"
+                  : garmin === "setup" ? "Not connected" : "Waiting for Garmin"}
               </div>
               <div className="sub">
                 {garmin === "waiting" ? "Last night's HRV, resting HR and sleep"
                   : garmin === "failed" ? "See the message above - training shown as planned"
+                  : garmin === "setup" ? "Connect Garmin readiness in Settings"
                   : "Sync your watch in Garmin Connect — checking every minute"}
               </div>
             </>

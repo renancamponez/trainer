@@ -108,7 +108,7 @@ export default function LogSession() {
             <span className="pill" style={{ background: "#3b6ea533", color: "#7fb0e6" }}>Garmin · auto</span>
           </div>
           <div className="note" style={{ marginBottom: 12 }}>
-            Synced from Garmin automatically each morning (overnight HRV, resting HR, sleep score).
+            Synced from Garmin automatically each morning via intervals.icu (overnight HRV, resting HR, sleep score).
             Edit a value here if you need to — they drive your readiness score.
           </div>
           <div className="grid cols-3">

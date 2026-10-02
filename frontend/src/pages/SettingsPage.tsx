@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { Settings, ZoneRow } from "../lib/types";
 import StravaCard from "../components/StravaCard";
+import WellnessCard from "../components/WellnessCard";
 
 export default function SettingsPage() {
   const [s, setS] = useState<Settings | null>(null);
@@ -73,6 +74,7 @@ export default function SettingsPage() {
 
       <div style={{ marginTop: 16, maxWidth: 520 }}>
         <StravaCard />
+        <div style={{ marginTop: 16 }}><WellnessCard /></div>
       </div>
     </>
   );

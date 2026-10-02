@@ -1,7 +1,7 @@
 import type {
   DaySummary, WeekSummary, DayLog, ScoreResult, SettingsResponse, Settings, PlannedSession,
   StravaStatus, StravaSyncResult, StravaConfigView, GoalProjection, WorkoutDetail, ReadinessResult,
-  PaceProfile, StrengthProgram, StrengthDaySlot,
+  PaceProfile, StrengthProgram, StrengthDaySlot, WellnessConfigView, WellnessSyncResult,
 } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE || "/api";
@@ -27,8 +27,11 @@ export const api = {
   workout: (date: string) => req<WorkoutDetail>(`/plan/workout/${date}`),
   profile: (date: string) => req<PaceProfile>(`/plan/profile/${date}`),
   strength: () => req<StrengthProgram>(`/strength`),
-  garminSync: () => req<{ status: string }>(`/garmin/sync`, { method: "POST" }),
-  garminStatus: () => req<{ configured: boolean; lastRun?: { ok: boolean; message: string; at: string } }>(`/garmin/status`),
+  wellnessConfig: () => req<WellnessConfigView>(`/wellness/config`),
+  wellnessSaveConfig: (athleteId: string, apiKey: string) =>
+    req<WellnessConfigView>(`/wellness/config`, { method: "PUT", body: JSON.stringify({ athleteId, apiKey }) }),
+  wellnessSync: (today: string, force = false) =>
+    req<WellnessSyncResult>(`/wellness/sync?today=${today}&force=${force}`, { method: "POST" }),
   strengthDay: (date: string) => req<StrengthDaySlot>(`/strength/day/${date}`),
 
   getLog: (date: string) => req<DayLog | null>(`/logs/${date}`).catch(() => null),

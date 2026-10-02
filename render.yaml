@@ -14,5 +14,3 @@ services:
         sync: false
       - key: APP_PASSWORD      # your login password (enables auth)
         sync: false
-      - key: GITHUB_TOKEN      # optional: lets the app start the Garmin sync when you open it
-        sync: false

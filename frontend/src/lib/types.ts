@@ -66,6 +66,12 @@ export interface ReadinessResult {
   verdict: string; action: string;
 }
 
+export interface WellnessRun { ok: boolean; message: string; daysWritten: number; at: string; }
+export interface WellnessConfigView { athleteId: string; keySet: boolean; lastRun?: WellnessRun; }
+export interface WellnessSyncResult {
+  status: "synced" | "throttled" | "not-configured" | "error"; message?: string; todayHasData: boolean;
+}
+
 export interface StrengthExercise {
   key: string; name: string; dose: string; upperOnly: boolean; legLift: boolean; cues: string[];
 }
